@@ -2,7 +2,7 @@
   <img src="https://i.ibb.co/bM8LfC4r/josie-avatar.png" alt="JOSIE Avatar" width="480" height="480"/>
 </p>
 
-# J.O.S.I.E.
+# J.O.S.I.E
 ### *Just One S\*xually Involved E-girl* — Your Local AI Companion
 
 JOSIE is a premium, localized AI desktop application designed for immersive roleplay and emotional conversations. Powered by Ollama and featuring a sleek, dark-mode interface, JOSIE brings your favorite roleplay models to life with integrated voice support and high-fidelity text-to-speech.
