@@ -1,0 +1,15 @@
+# JOSIE - Just One Sexually Involved E-girl
+# Core Dependencies
+requests
+Pillow
+edge-tts
+SpeechRecognition
+
+# Platform Specific (Microphone Support)
+# For Windows/Linux, you MUST have PyAudio for voice input:
+PyAudio
+
+# Optional (only if you want to run the Python file on macOS too)
+# pyobjc-framework-Speech
+# pyobjc-framework-AVFoundation
+# pyobjc-framework-AppKit
