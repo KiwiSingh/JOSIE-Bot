@@ -1,15 +1,13 @@
 import Foundation
 import AVFoundation
-import Observation
+import Combine
 
 @MainActor
-@Observable
-public class JosieVoiceManager: NSObject {
+public class JosieVoiceManager: NSObject, ObservableObject {
     
-    public var isListening = false
-    public var isMuted = false
+    @Published public var isListening = false
+    @Published public var isMuted = false
 
-    // AVSpeechSynthesizer is NOT Sendable → keep fully isolated to MainActor
     private let synthesizer = AVSpeechSynthesizer()
 
     public override init() {
@@ -33,7 +31,7 @@ public class JosieVoiceManager: NSObject {
         synthesizer.speak(utterance)
     }
 
-    // MARK: - Speech-to-Text Stub
+    // MARK: - Speech Toggle Stub
 
     public func toggleListening(onResult: @escaping (String) -> Void) {
         isListening.toggle()
@@ -44,8 +42,6 @@ public class JosieVoiceManager: NSObject {
             print("🛑 Mic off")
         }
     }
-
-    // MARK: - Stop Speech
 
     public func stopSpeaking() {
         synthesizer.stopSpeaking(at: .immediate)
