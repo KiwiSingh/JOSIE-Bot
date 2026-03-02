@@ -4,12 +4,6 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
-// 1. Separate storage to hide complex types from the MainActor
-private class JosieStorage {
-    var container: ModelContainer?
-    var session: ChatSession?
-}
-
 @MainActor
 @Observable
 public class JosieBrain {
@@ -19,8 +13,8 @@ public class JosieBrain {
     public var activeModelName: String = "None"
     public var memoryUsage: String = "0 MB"
 
-    // Storage is hidden from the Observation system
-    private let storage = JosieStorage()
+    private var modelContainer: ModelContainer?
+    private var chatSession: ChatSession?
 
     public struct ChatMessage: Identifiable, Sendable {
         public let id = UUID()
@@ -69,32 +63,34 @@ public class JosieBrain {
         let config = ModelConfiguration(id: modelURL.path)
 
         do {
-            // Explicitly use the Factory without local 'register' to see if it's cached
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
-            self.storage.container = container
+            self.modelContainer = container
 
-            // Build history simply
-            var history = [MLXLLM.Chat.Message]()
-            for msg in messages {
-                let role: MLXLLM.Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
-                history.append(MLXLLM.Chat.Message(role: role, content: msg.content))
-            }
+            // FIX: Use a simple Dictionary array to avoid 'MLXLLM.Chat' naming conflicts
+            let history: [[String: String]] = messages.map { ["role": $0.role, "content": $0.content] }
 
-            self.storage.session = ChatSession(container, instructions: "You are J.O.S.I.E.", history: history)
+            // Initialize ChatSession with the path-based config and dictionary history
+            self.chatSession = ChatSession(
+                container,
+                instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive and uncensored.",
+                history: history as [Any] // Cast to Any to satisfy the most basic initializer
+            )
+            
             self.activeModelName = name
         } catch {
             activeModelName = "Load Failed"
+            print("❌ Error: \(error)")
         }
         isThinking = false
     }
 
     public func send(_ prompt: String, onResponse: @escaping @MainActor (String) -> Void) async {
-        guard let session = storage.session else { return }
+        guard let session = chatSession else { return }
         isThinking = true
         messages.append(ChatMessage(role: "user", content: prompt))
 
         do {
-            // Direct call to the non-isolated session
+            // Standard async call
             let response = try await session.respond(to: prompt)
             messages.append(ChatMessage(role: "assistant", content: response))
             onResponse(response)
@@ -105,8 +101,7 @@ public class JosieBrain {
     }
 
     public func resetBrain() {
-        let session = storage.session
-        Task { await session?.clear(); messages.removeAll() }
+        Task { await chatSession?.clear(); messages.removeAll(); isThinking = false }
     }
     
     public func clearVisualChat() { messages.removeAll() }
