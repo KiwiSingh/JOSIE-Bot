@@ -40,25 +40,22 @@ class JosieBrain {
         
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
-        
-        // 1. Create a configuration using the name as the ID
         let config = ModelConfiguration(id: name)
 
         do {
-            // 2. 2026 PATCH: Register the local URL so the Factory knows WHERE the ID lives
+            // Register local path
             LLMModelFactory.shared.register(configuration: config, at: modelURL)
 
-            // 3. Load using the registered config
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // 4. 2026 PATCH: Explicit Role mapping for history
-            let history = messages.compactMap { msg -> Chat.Message? in
-                // Handle "assistant" vs "user" strings specifically
-                let role: Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
-                return Chat.Message(role: role, content: msg.content)
+            // 2026 FIX: Use Full Module Path to avoid ambiguity errors
+            let history = messages.map { msg -> MLXLLM.Chat.Message in
+                let role: MLXLLM.Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
+                return MLXLLM.Chat.Message(role: role, content: msg.content)
             }
 
+            // Correct parameter order for ChatSession
             self.chatSession = ChatSession(
                 container,
                 instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored.",
@@ -66,10 +63,10 @@ class JosieBrain {
             )
             
             self.activeModelName = name
-            print("✅ J.O.S.I.E. loaded: \(name)")
+            print("✅ J.O.S.I.E. Online")
         } catch {
-            print("❌ Error loading model: \(error)")
-            activeModelName = "Error: \(name)"
+            print("❌ Error: \(error)")
+            activeModelName = "Error Loading"
         }
         isThinking = false
     }
