@@ -36,21 +36,29 @@ class JosieBrain {
 
     func loadModel(_ name: String) async {
         isThinking = true
+        activeModelName = "Loading \(name)..."
+        
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
-        let config = ModelConfiguration(id: modelURL.path)
+        
+        // 1. Create a configuration using the name as the ID
+        let config = ModelConfiguration(id: name)
 
         do {
+            // 2. 2026 PATCH: Register the local URL so the Factory knows WHERE the ID lives
+            LLMModelFactory.shared.register(configuration: config, at: modelURL)
+
+            // 3. Load using the registered config
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // 2026 FIX: Convert String role to Chat.Message.Role enum
+            // 4. 2026 PATCH: Explicit Role mapping for history
             let history = messages.compactMap { msg -> Chat.Message? in
-                guard let role = Chat.Message.Role(rawValue: msg.role) else { return nil }
+                // Handle "assistant" vs "user" strings specifically
+                let role: Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
                 return Chat.Message(role: role, content: msg.content)
             }
 
-            // 2026 FIX: Correct parameter order for ChatSession
             self.chatSession = ChatSession(
                 container,
                 instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored.",
@@ -58,8 +66,10 @@ class JosieBrain {
             )
             
             self.activeModelName = name
+            print("✅ J.O.S.I.E. loaded: \(name)")
         } catch {
-            print("Error loading model: \(error)")
+            print("❌ Error loading model: \(error)")
+            activeModelName = "Error: \(name)"
         }
         isThinking = false
     }
@@ -70,7 +80,6 @@ class JosieBrain {
         isThinking = true
         messages.append(ChatMessage(role: "user", content: prompt))
 
-        // Offload inference to detached task for Swift 6 safety
         let task = Task.detached(priority: .userInitiated) {
             do {
                 return try await session.respond(to: prompt)
@@ -81,7 +90,6 @@ class JosieBrain {
 
         let result = await task.value
         
-        // UI Updates on MainActor
         messages.append(ChatMessage(role: "assistant", content: result))
         onResponse(result)
         isThinking = false
