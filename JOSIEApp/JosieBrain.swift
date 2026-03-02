@@ -16,8 +16,6 @@ public class JosieBrain: ObservableObject {
     @Published public var availableModels: [String] = []
     @Published public var activeModelName: String = "None"
     @Published public var memoryUsage: String = "0 MB"
-    
-    // NEW: user-visible error
     @Published public var lastError: String? = nil
 
     private var modelContainer: ModelContainer?
@@ -42,7 +40,9 @@ public class JosieBrain: ObservableObject {
 
     private func startMemoryMonitor() {
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.updateMemoryUsage()
+            Task { @MainActor in
+                self?.updateMemoryUsage()
+            }
         }
     }
 
@@ -82,7 +82,7 @@ public class JosieBrain: ObservableObject {
         availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
     }
 
-    // MARK: - Model Loading (User-Facing Errors)
+    // MARK: - Model Loading
 
     public func loadModel(_ name: String) async {
         isThinking = true
@@ -98,7 +98,7 @@ public class JosieBrain: ObservableObject {
         let exists = FileManager.default.fileExists(atPath: modelURL.path, isDirectory: &isDir)
 
         if !exists || !isDir.boolValue {
-            lastError = "Model folder not found at:\n\(modelURL.lastPathComponent)"
+            lastError = "Model folder not found: \(name)"
             activeModelName = "Load Failed"
             isThinking = false
             return
@@ -110,37 +110,20 @@ public class JosieBrain: ObservableObject {
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             modelContainer = container
 
-            var history: [MLXLLM.Chat.Message] = []
-
-            for msg in messages {
-                let role: MLXLLM.Chat.Message.Role =
-                    (msg.role.lowercased() == "assistant") ? .assistant : .user
-
-                history.append(
-                    MLXLLM.Chat.Message(role: role, content: msg.content)
-                )
-            }
-
-            chatSession = ChatSession(
-                container: container,
-                instructions: "You are J.O.S.I.E.",
-                history: history
-            )
+            // ✅ Correct initializer for your MLX version
+            chatSession = ChatSession(container, instructions: "You are J.O.S.I.E.")
 
             activeModelName = name
-
         } catch {
             activeModelName = "Load Failed"
-            
-            // Make error readable for humans
+
             let readable = error.localizedDescription.isEmpty
                 ? String(describing: error)
                 : error.localizedDescription
 
             lastError = """
-            Failed to load model "\(name)".
+            Failed to load model "\(name)"
 
-            Reason:
             \(readable)
             """
         }
