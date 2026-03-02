@@ -1,0 +1,24 @@
+name: JOSIE
+options:
+  bundleIdPrefix: com.kiwisingh
+targets:
+  JOSIE:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - JOSIEApp
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.kiwisingh.josie
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_NSMicrophoneUsageDescription: "JOSIE needs the mic to hear you."
+      INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "JOSIE uses speech recognition to understand you."
+      INFOPLIST_KEY_UIFileSharingEnabled: YES
+      INFOPLIST_KEY_UISupportsDocumentBrowser: YES
+    dependencies:
+      - package: mlx-swift-lm
+packages:
+  mlx-swift-lm:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    version: 2.30.6

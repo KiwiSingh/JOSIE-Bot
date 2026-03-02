@@ -1,0 +1,4 @@
+{
+  "images" : [ { "idiom" : "iphone", "size" : "1024x1024", "filename" : "icon.png" } ],
+  "info" : { "version" : 1, "author" : "xcode" }
+}
