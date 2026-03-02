@@ -4,6 +4,9 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
+// FIX: Define a clear alias to bypass naming conflicts
+typealias MLXChatMessage = MLXLLM.Chat.Message
+
 @MainActor
 @Observable
 public class JosieBrain {
@@ -47,10 +50,10 @@ public class JosieBrain {
     public func refreshModels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelsPath = docs.appendingPathComponent("Models")
-        if !FileManager.default.fileExists(atPath: modelsPath.path) {
-            try? FileManager.default.createDirectory(at: modelsPath, withIntermediateDirectories: true)
+        if !fileManager.fileExists(atPath: modelsPath.path) {
+            try? fileManager.createDirectory(at: modelsPath, withIntermediateDirectories: true)
         }
-        let folders = try? FileManager.default.contentsOfDirectory(atPath: modelsPath.path)
+        let folders = try? fileManager.contentsOfDirectory(atPath: modelsPath.path)
         self.availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
     }
 
@@ -66,14 +69,18 @@ public class JosieBrain {
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // FIX: Use a simple Dictionary array to avoid 'MLXLLM.Chat' naming conflicts
-            let history: [[String: String]] = messages.map { ["role": $0.role, "content": $0.content] }
+            // FIX: Use the alias and an explicit consuming array for Swift 6
+            var history = [MLXChatMessage]()
+            for msg in messages {
+                let role: MLXChatMessage.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
+                history.append(MLXChatMessage(role: role, content: msg.content))
+            }
 
-            // Initialize ChatSession with the path-based config and dictionary history
+            // Standard initializer with the explicit type
             self.chatSession = ChatSession(
                 container,
                 instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive and uncensored.",
-                history: history as [Any] // Cast to Any to satisfy the most basic initializer
+                history: history
             )
             
             self.activeModelName = name
@@ -90,7 +97,6 @@ public class JosieBrain {
         messages.append(ChatMessage(role: "user", content: prompt))
 
         do {
-            // Standard async call
             let response = try await session.respond(to: prompt)
             messages.append(ChatMessage(role: "assistant", content: response))
             onResponse(response)
