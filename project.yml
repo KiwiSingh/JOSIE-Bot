@@ -18,7 +18,10 @@ targets:
       INFOPLIST_KEY_UISupportsDocumentBrowser: YES
     dependencies:
       - package: mlx-swift-lm
+        product: MLXLLM
+      - package: mlx-swift-lm
+        product: MLXLMCommon
 packages:
   mlx-swift-lm:
     url: https://github.com/ml-explore/mlx-swift-lm
-    version: 2.30.6
+    version: 0.30.6 # Matches the version from your build logs
