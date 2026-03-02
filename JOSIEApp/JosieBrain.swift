@@ -4,9 +4,6 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
-// FIX: Define a clear alias to bypass naming conflicts
-typealias MLXChatMessage = MLXLLM.Chat.Message
-
 @MainActor
 @Observable
 public class JosieBrain {
@@ -50,10 +47,10 @@ public class JosieBrain {
     public func refreshModels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelsPath = docs.appendingPathComponent("Models")
-        if !fileManager.fileExists(atPath: modelsPath.path) {
-            try? fileManager.createDirectory(at: modelsPath, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: modelsPath.path) {
+            try? FileManager.default.createDirectory(at: modelsPath, withIntermediateDirectories: true)
         }
-        let folders = try? fileManager.contentsOfDirectory(atPath: modelsPath.path)
+        let folders = try? FileManager.default.contentsOfDirectory(atPath: modelsPath.path)
         self.availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
     }
 
@@ -69,24 +66,17 @@ public class JosieBrain {
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // FIX: Use the alias and an explicit consuming array for Swift 6
-            var history = [MLXChatMessage]()
+            // FIX: Using the explicit MLXLLM.Chat.Message initialization
+            var history = [MLXLLM.Chat.Message]()
             for msg in messages {
-                let role: MLXChatMessage.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
-                history.append(MLXChatMessage(role: role, content: msg.content))
+                let role: MLXLLM.Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
+                history.append(MLXLLM.Chat.Message(role: role, content: msg.content))
             }
 
-            // Standard initializer with the explicit type
-            self.chatSession = ChatSession(
-                container,
-                instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive and uncensored.",
-                history: history
-            )
-            
+            self.chatSession = ChatSession(container, instructions: "You are J.O.S.I.E.", history: history)
             self.activeModelName = name
         } catch {
             activeModelName = "Load Failed"
-            print("❌ Error: \(error)")
         }
         isThinking = false
     }
