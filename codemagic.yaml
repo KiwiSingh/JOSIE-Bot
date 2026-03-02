@@ -1,0 +1,37 @@
+# J.O.S.I.E. iOS Cloud Build Configuration
+working_directory: .
+bundle_identifier: com.kiwisingh.josie # Ensure this matches your Xcode project
+
+workflows:
+  ios-josie-build:
+    name: JOSIE iOS Build
+    instance_type: mac_mini_m2 # MLX builds faster on Apple Silicon instances
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install Swift Package Dependencies
+        script: | 
+          xcodebuild -resolvePackageDependencies -project JOSIE.xcodeproj -scheme JOSIE
+      - name: Build J.O.S.I.E. (Debug)
+        script: | 
+          # This compiles the app and the MLX framework for a physical iPhone
+          xcodebuild build \
+            -project JOSIE.xcodeproj \
+            -scheme JOSIE \
+            -sdk iphoneos \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_IDENTITY=""
+    artifacts:
+      - build/ios/iphoneos/*.app
+    publishing:
+      email:
+        recipients:
+          - kiwisingh@proton.me # Your JOSIE dev email
+        notify:
+          success: true
+          failure: true
