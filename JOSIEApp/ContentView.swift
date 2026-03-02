@@ -24,10 +24,13 @@ struct ContentView: View {
                         .listStyle(.plain)
                         .onChange(of: brain.messages.count) { _, _ in
                             if let lastId = brain.messages.last?.id {
-                                withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+                                withAnimation {
+                                    proxy.scrollTo(lastId, anchor: .bottom)
+                                }
                             }
                         }
                     }
+
                     controlView
                 }
             }
@@ -37,6 +40,20 @@ struct ContentView: View {
             .onAppear {
                 brain.refreshModels()
             }
+            // ✅ NEW: User-facing error alert
+            .alert(
+                "Model Error",
+                isPresented: Binding(
+                    get: { brain.lastError != nil },
+                    set: { _ in brain.lastError = nil }
+                )
+            ) {
+                Button("OK", role: .cancel) {
+                    brain.lastError = nil
+                }
+            } message: {
+                Text(brain.lastError ?? "")
+            }
         }
     }
 
@@ -44,14 +61,18 @@ struct ContentView: View {
         VStack {
             HStack {
                 Button { showPicker = true } label: {
-                    Image(systemName: "cpu").foregroundColor(.pink)
+                    Image(systemName: "cpu")
+                        .foregroundColor(.pink)
                 }
+
                 Spacer()
+
                 Button { voice.isMuted.toggle() } label: {
                     Image(systemName: voice.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                         .foregroundColor(voice.isMuted ? .gray : .pink)
                 }
-            }.padding()
+            }
+            .padding()
 
             Image("josie_avatar")
                 .resizable()
@@ -73,34 +94,67 @@ struct ContentView: View {
     var controlView: some View {
         VStack(spacing: 0) {
             HStack {
-                Button("🗑️ Clear") { brain.clearVisualChat() }.font(.caption).foregroundColor(.gray)
+                Button("🗑️ Clear") {
+                    brain.clearVisualChat()
+                }
+                .font(.caption)
+                .foregroundColor(.gray)
+
                 Spacer()
-                Button("🧠 Reset") { brain.resetBrain() }.font(.caption).foregroundColor(.gray)
-            }.padding(.horizontal).padding(.top, 8)
+
+                Button("🧠 Reset") {
+                    brain.resetBrain()
+                }
+                .font(.caption)
+                .foregroundColor(.gray)
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
 
             HStack(spacing: 12) {
                 Button {
                     voice.toggleListening { input = $0 }
                 } label: {
                     Image(systemName: voice.isListening ? "stop.circle.fill" : "mic.fill")
-                        .foregroundColor(voice.isListening ? .red : .white).font(.title2)
+                        .foregroundColor(voice.isListening ? .red : .white)
+                        .font(.title2)
                 }
 
                 TextField("Message JOSIE...", text: $input)
-                    .padding(10).background(Capsule().fill(.white.opacity(0.1))).foregroundColor(.white)
-                    .submitLabel(.send).onSubmit { performSend() }
+                    .padding(10)
+                    .background(Capsule().fill(.white.opacity(0.1)))
+                    .foregroundColor(.white)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        performSend()
+                    }
 
-                Button { performSend() } label: {
-                    Image(systemName: "arrow.up.circle.fill").font(.title).foregroundColor(input.isEmpty ? .gray : .pink)
-                }.disabled(input.isEmpty || brain.isThinking)
-            }.padding()
-        }.background(Color.black.ignoresSafeArea(edges: .bottom))
+                Button {
+                    performSend()
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title)
+                        .foregroundColor(input.isEmpty ? .gray : .pink)
+                }
+                .disabled(input.isEmpty || brain.isThinking)
+            }
+            .padding()
+        }
+        .background(Color.black.ignoresSafeArea(edges: .bottom))
     }
 
     private func performSend() {
         guard !input.isEmpty else { return }
-        let p = input
+
+        let prompt = input
         input = ""
-        Task { await brain.send(p) { if !voice.isMuted { voice.speak($0) } } }
+
+        Task {
+            await brain.send(prompt) { response in
+                if !voice.isMuted {
+                    voice.speak(response)
+                }
+            }
+        }
     }
 }
