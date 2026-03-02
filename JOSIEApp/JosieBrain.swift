@@ -1,5 +1,7 @@
 import SwiftUI
 import Foundation
+import Observation
+import Darwin
 import MLX
 import MLXLLM
 import MLXLMCommon
@@ -7,6 +9,7 @@ import MLXLMCommon
 @MainActor
 @Observable
 public class JosieBrain {
+    
     public var messages: [ChatMessage] = []
     public var isThinking = false
     public var availableModels: [String] = []
@@ -20,69 +23,108 @@ public class JosieBrain {
         public let id = UUID()
         public let role: String
         public let content: String
-        public init(role: String, content: String) { self.role = role; self.content = content }
+        
+        public init(role: String, content: String) {
+            self.role = role
+            self.content = content
+        }
     }
 
-    public init() { startMemoryMonitor() }
+    public init() {
+        startMemoryMonitor()
+    }
+
+    // MARK: - Memory Monitor
 
     private func startMemoryMonitor() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            Task { @MainActor in self.updateMemoryUsage() }
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateMemoryUsage()
+            }
         }
     }
 
     private func updateMemoryUsage() {
         var taskInfo = mach_task_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size)
+        var count = mach_msg_type_number_t(
+            MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size
+        )
+
         let result: kern_return_t = withUnsafeMutablePointer(to: &taskInfo) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+                task_info(
+                    mach_task_self_,
+                    task_flavor_t(MACH_TASK_BASIC_INFO),
+                    $0,
+                    &count
+                )
             }
         }
+
         if result == KERN_SUCCESS {
-            self.memoryUsage = "\(taskInfo.resident_size / 1024 / 1024) MB"
+            memoryUsage = "\(taskInfo.resident_size / 1024 / 1024) MB"
         }
     }
+
+    // MARK: - Model Handling
 
     public func refreshModels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelsPath = docs.appendingPathComponent("Models")
+
         if !FileManager.default.fileExists(atPath: modelsPath.path) {
             try? FileManager.default.createDirectory(at: modelsPath, withIntermediateDirectories: true)
         }
+
         let folders = try? FileManager.default.contentsOfDirectory(atPath: modelsPath.path)
-        self.availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
+        availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
     }
 
     public func loadModel(_ name: String) async {
         isThinking = true
         activeModelName = "Loading..."
-        
+
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
         let config = ModelConfiguration(id: modelURL.path)
 
         do {
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
-            self.modelContainer = container
+            modelContainer = container
 
-            // FIX: Using the explicit MLXLLM.Chat.Message initialization
-            var history = [MLXLLM.Chat.Message]()
+            var history: [MLXLLM.Chat.Message] = []
+
             for msg in messages {
-                let role: MLXLLM.Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
-                history.append(MLXLLM.Chat.Message(role: role, content: msg.content))
+                let role: MLXLLM.Chat.Message.Role =
+                    (msg.role.lowercased() == "assistant") ? .assistant : .user
+
+                history.append(
+                    MLXLLM.Chat.Message(role: role, content: msg.content)
+                )
             }
 
-            self.chatSession = ChatSession(container, instructions: "You are J.O.S.I.E.", history: history)
-            self.activeModelName = name
+            chatSession = ChatSession(
+                container: container,
+                instructions: "You are J.O.S.I.E.",
+                history: history
+            )
+
+            activeModelName = name
         } catch {
             activeModelName = "Load Failed"
         }
+
         isThinking = false
     }
 
-    public func send(_ prompt: String, onResponse: @escaping @MainActor (String) -> Void) async {
+    // MARK: - Chat
+
+    public func send(
+        _ prompt: String,
+        onResponse: @escaping @MainActor (String) -> Void
+    ) async {
         guard let session = chatSession else { return }
+
         isThinking = true
         messages.append(ChatMessage(role: "user", content: prompt))
 
@@ -91,14 +133,28 @@ public class JosieBrain {
             messages.append(ChatMessage(role: "assistant", content: response))
             onResponse(response)
         } catch {
-            messages.append(ChatMessage(role: "assistant", content: "Error: \(error.localizedDescription)"))
+            messages.append(
+                ChatMessage(
+                    role: "assistant",
+                    content: "Error: \(error.localizedDescription)"
+                )
+            )
         }
+
         isThinking = false
     }
 
+    // MARK: - Reset
+
     public func resetBrain() {
-        Task { await chatSession?.clear(); messages.removeAll(); isThinking = false }
+        Task { @MainActor in
+            await chatSession?.clear()
+            messages.removeAll()
+            isThinking = false
+        }
     }
-    
-    public func clearVisualChat() { messages.removeAll() }
+
+    public func clearVisualChat() {
+        messages.removeAll()
+    }
 }
