@@ -24,4 +24,4 @@ targets:
 packages:
   mlx-swift-lm:
     url: https://github.com/ml-explore/mlx-swift-lm
-    version: 0.30.6 # Matches the version from your build logs
+    branch: main # This bypasses the version mismatch error
