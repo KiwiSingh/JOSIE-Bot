@@ -40,22 +40,28 @@ class JosieBrain {
         
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
+        
+        // 1. Create a configuration using the folder name as the ID
         let config = ModelConfiguration(id: name)
 
         do {
-            // Register local path
+            // 2. 2026 FIX: Register the local path so the Factory knows where to find the weights
             LLMModelFactory.shared.register(configuration: config, at: modelURL)
 
+            // 3. Load the container using the registered config
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // 2026 FIX: Use Full Module Path to avoid ambiguity errors
-            let history = messages.map { msg -> MLXLLM.Chat.Message in
+            // 4. 2026 FIX: Explicitly build history using the MLXLLM.Chat.Message type 
+            // to avoid compiler ambiguity with the 'Chat' namespace.
+            var history = [MLXLLM.Chat.Message]()
+            for msg in messages {
                 let role: MLXLLM.Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
-                return MLXLLM.Chat.Message(role: role, content: msg.content)
+                let chatMsg = MLXLLM.Chat.Message(role: role, content: msg.content)
+                history.append(chatMsg)
             }
 
-            // Correct parameter order for ChatSession
+            // 5. Initialize ChatSession with the new container and instructions
             self.chatSession = ChatSession(
                 container,
                 instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored.",
@@ -63,9 +69,9 @@ class JosieBrain {
             )
             
             self.activeModelName = name
-            print("✅ J.O.S.I.E. Online")
+            print("✅ J.O.S.I.E. is online with model: \(name)")
         } catch {
-            print("❌ Error: \(error)")
+            print("❌ Error loading model: \(error)")
             activeModelName = "Error Loading"
         }
         isThinking = false
@@ -77,6 +83,8 @@ class JosieBrain {
         isThinking = true
         messages.append(ChatMessage(role: "user", content: prompt))
 
+        // 6. 2026 FIX: Detach the inference task to keep the UI thread free
+        // while satisfying Swift 6 strict concurrency checks.
         let task = Task.detached(priority: .userInitiated) {
             do {
                 return try await session.respond(to: prompt)
@@ -87,6 +95,7 @@ class JosieBrain {
 
         let result = await task.value
         
+        // Back on the @MainActor to update the UI
         messages.append(ChatMessage(role: "assistant", content: result))
         onResponse(result)
         isThinking = false
