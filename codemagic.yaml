@@ -35,3 +35,22 @@ workflows:
         notify:
           success: true
           failure: true
+          scripts:
+  - name: Install XcodeGen and Generate Project
+    script: |
+      brew install xcodegen
+      xcodegen generate
+  - name: Install Swift Package Dependencies
+    script: | 
+      xcodebuild -resolvePackageDependencies -project JOSIE.xcodeproj -scheme JOSIE
+  - name: Build J.O.S.I.E. (Debug)
+    script: | 
+      xcodebuild build \
+        -project JOSIE.xcodeproj \
+        -scheme JOSIE \
+        -sdk iphoneos \
+        -configuration Debug \
+        -destination 'generic/platform=iOS' \
+        CODE_SIGNING_ALLOWED=NO \
+        CODE_SIGNING_REQUIRED=NO \
+        CODE_SIGNING_IDENTITY=""
