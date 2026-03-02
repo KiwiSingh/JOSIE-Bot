@@ -1,3 +1,4 @@
+import SwiftUI
 struct ChatBubble: View {
   let msg: JosieBrain.ChatMessage
   var body: some View {
