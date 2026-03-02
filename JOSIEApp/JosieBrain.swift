@@ -12,7 +12,7 @@ public class JosieBrain {
     public var availableModels: [String] = []
     public var activeModelName: String = "None"
     
-    // Memory Monitoring Property
+    // Real-time memory monitoring for 7B models
     public var memoryUsage: String = "0 MB"
 
     private var modelContainer: ModelContainer?
@@ -33,7 +33,7 @@ public class JosieBrain {
         startMemoryMonitor()
     }
 
-    // --- Memory Monitor Logic ---
+    // --- Memory Monitor ---
     private func startMemoryMonitor() {
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             Task { @MainActor in
@@ -78,33 +78,29 @@ public class JosieBrain {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
         
-        // Ensure path exists before attempting MLX load
+        // Ensure path exists for JosieXwin
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
-            print("❌ JOSIE Error: Directory missing at \(modelURL.path)")
             activeModelName = "Folder Not Found"
             isThinking = false
             return
         }
 
-        // 2026 Local Path-based Configuration
         let config = ModelConfiguration(id: modelURL.path)
 
         do {
-            // Register the local path so MLX knows where to find the weights
+            // Register local path to bypass HF repo lookup
             LLMModelFactory.shared.register(configuration: config, at: modelURL)
 
-            // Loading the container using the 2026 Core API
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // Explicitly build history using the MLXLLM.Chat.Message type
+            // Explicitly build history using MLXLLM namespacing
             var history = [MLXLLM.Chat.Message]()
             for msg in messages {
                 let role: MLXLLM.Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
                 history.append(MLXLLM.Chat.Message(role: role, content: msg.content))
             }
 
-            // Initialize ChatSession with history and instructions
             self.chatSession = ChatSession(
                 container,
                 instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored.",
@@ -114,21 +110,20 @@ public class JosieBrain {
             self.activeModelName = name
             print("✅ J.O.S.I.E. Online: \(name)")
         } catch {
-            // Detailed error reporting for the UI
             let errorDescription = "\(error)"
-            print("❌ MLX Critical Load Error: \(errorDescription)")
+            print("❌ MLX Load Error: \(errorDescription)")
             activeModelName = "Error: " + String(errorDescription.prefix(15))
         }
         isThinking = false
     }
 
-    public func send(_ prompt: String, onResponse: @escaping @MainActor @Sendable (String) -> Void) async {
+    public func send(_ prompt: String, onResponse: @escaping @MainActor (String) -> Void) async {
         guard let session = chatSession else { return }
         
         isThinking = true
         messages.append(ChatMessage(role: "user", content: prompt))
 
-        // Offload inference to detached task for Swift 6 safety
+        // FIX: Execute respond task without passing the onResponse closure
         let task = Task.detached(priority: .userInitiated) {
             do {
                 return try await session.respond(to: prompt)
@@ -137,11 +132,12 @@ public class JosieBrain {
             }
         }
 
+        // Await the result back on the MainActor
         let result = await task.value
         
-        // Back on the @MainActor to update the UI
         messages.append(ChatMessage(role: "assistant", content: result))
         onResponse(result)
+        
         isThinking = false
     }
 
