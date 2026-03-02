@@ -1,3 +1,4 @@
+import SwiftUI
 import Foundation
 import MLX
 import MLXLLM
