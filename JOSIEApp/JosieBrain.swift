@@ -4,7 +4,7 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
-@MainActor // Crucial for @Observable UI updates in Swift 6
+@MainActor
 @Observable
 class JosieBrain {
     var messages: [ChatMessage] = []
@@ -15,7 +15,7 @@ class JosieBrain {
     private var modelContainer: ModelContainer?
     private var chatSession: ChatSession?
 
-    struct ChatMessage: Identifiable, Sendable { // Added Sendable for concurrency safety
+    struct ChatMessage: Identifiable, Sendable {
         let id = UUID()
         let role: String
         let content: String
@@ -38,24 +38,22 @@ class JosieBrain {
         isThinking = true
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
-        
-        // Use the explicit local path for the configuration
         let config = ModelConfiguration(id: modelURL.path)
 
         do {
-            // MLX 2026 Factory loading
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // Prepare history in the new [String: String] format
-            let history = messages.map { ["role": $0.role, "content": $0.content] }
+            // 2026 FIX: MLX now requires Chat.Message objects instead of Dictionaries
+            let history = messages.map { Chat.Message(role: $0.role, content: $0.content) }
 
-            // Initialize ChatSession with the new 2026 re-hydration API
+            // 2026 FIX: Updated ChatSession initializer signature
             self.chatSession = ChatSession(
                 container,
-                history: history,
-                instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored."
+                instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored.",
+                history: history
             )
+            
             self.activeModelName = name
         } catch {
             print("Error loading model: \(error)")
@@ -67,16 +65,13 @@ class JosieBrain {
         guard let session = chatSession else { return }
         isThinking = true
         
-        // Update UI state immediately
-        let userMessage = ChatMessage(role: "user", content: prompt)
-        messages.append(userMessage)
+        messages.append(ChatMessage(role: "user", content: prompt))
 
         do {
-            // MLX 2026 respond(to:) returns a full response object or string
+            // 2026 FIX: Use the updated respond API
             let response = try await session.respond(to: prompt)
             
-            let assistantMessage = ChatMessage(role: "assistant", content: response)
-            messages.append(assistantMessage)
+            messages.append(ChatMessage(role: "assistant", content: response))
             onResponse(response)
         } catch {
             print("Inference failed: \(error)")
@@ -85,10 +80,13 @@ class JosieBrain {
     }
 
     func resetBrain() {
-        // ChatSession.clear() is now an async operation in 2026
         Task {
             await chatSession?.clear()
             messages.removeAll()
         }
+    }
+    
+    func clearVisualChat() {
+        messages.removeAll()
     }
 }
