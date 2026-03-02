@@ -12,6 +12,10 @@ workflows:
         script: |
           brew install xcodegen
           xcodegen generate
+      - name: Download Metal Toolchain
+        script: |
+          # Crucial for MLX GPU acceleration in 2026 Xcode environments
+          xcodebuild -downloadComponent MetalToolchain
       - name: Install Swift Package Dependencies
         script: |
           xcodebuild -resolvePackageDependencies -project JOSIE.xcodeproj -scheme JOSIE
