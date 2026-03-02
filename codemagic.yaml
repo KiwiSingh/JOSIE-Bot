@@ -31,7 +31,8 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_IDENTITY=""
     artifacts:
-      - build/ios/iphoneos/*.app
+      # 2026 FIX: Pointing to the exact DerivedData path where xcodebuild actually puts the .app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug-iphoneos/*.app
     publishing:
       email:
         recipients:
