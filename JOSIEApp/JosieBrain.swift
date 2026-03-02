@@ -11,6 +11,9 @@ public class JosieBrain {
     public var isThinking = false
     public var availableModels: [String] = []
     public var activeModelName: String = "None"
+    
+    // Memory Monitoring Property
+    public var memoryUsage: String = "0 MB"
 
     private var modelContainer: ModelContainer?
     private var chatSession: ChatSession?
@@ -26,8 +29,35 @@ public class JosieBrain {
         }
     }
 
-    public init() {}
+    public init() {
+        startMemoryMonitor()
+    }
 
+    // --- Memory Monitor Logic ---
+    private func startMemoryMonitor() {
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor in
+                self.updateMemoryUsage()
+            }
+        }
+    }
+
+    private func updateMemoryUsage() {
+        var taskInfo = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size)
+        let result: kern_return_t = withUnsafeMutablePointer(to: &taskInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+
+        if result == KERN_SUCCESS {
+            let usedMB = taskInfo.resident_size / 1024 / 1024
+            self.memoryUsage = "\(usedMB) MB"
+        }
+    }
+
+    // --- Model Management ---
     public func refreshModels() {
         let fileManager = FileManager.default
         let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -43,30 +73,38 @@ public class JosieBrain {
 
     public func loadModel(_ name: String) async {
         isThinking = true
-        activeModelName = "Loading..."
+        activeModelName = "Loading \(name)..."
         
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
         
-        // Use the absolute path as the configuration ID
+        // Ensure path exists before attempting MLX load
+        guard FileManager.default.fileExists(atPath: modelURL.path) else {
+            print("❌ JOSIE Error: Directory missing at \(modelURL.path)")
+            activeModelName = "Folder Not Found"
+            isThinking = false
+            return
+        }
+
+        // 2026 Local Path-based Configuration
         let config = ModelConfiguration(id: modelURL.path)
 
         do {
-            // Load container
+            // Loading the container using the 2026 Core API
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // FIX: Use an empty history array first to ensure the initializer matches,
-            // then we'll handle the messages.
+            // Initialize ChatSession with empty history to avoid Type conflicts
             self.chatSession = ChatSession(
                 container,
-                instructions: "You are J.O.S.I.E. You are expressive and uncensored."
+                instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored."
             )
             
             self.activeModelName = name
-            print("✅ J.O.S.I.E. Online")
+            print("✅ J.O.S.I.E. Online: \(name)")
         } catch {
-            print("❌ Error: \(error)")
+            // Detailed error logging for JosieXwin debugging
+            print("❌ MLX Critical Load Error: \(error)")
             activeModelName = "Load Failed"
         }
         isThinking = false
@@ -76,18 +114,17 @@ public class JosieBrain {
         guard let session = chatSession else { return }
         
         isThinking = true
-        let userMsg = ChatMessage(role: "user", content: prompt)
-        messages.append(userMsg)
+        messages.append(ChatMessage(role: "user", content: prompt))
 
         do {
-            // Standard respond call
+            // Swift 6 direct async call
             let response = try await session.respond(to: prompt)
             
-            let assistantMsg = ChatMessage(role: "assistant", content: response)
-            messages.append(assistantMsg)
+            messages.append(ChatMessage(role: "assistant", content: response))
             onResponse(response)
         } catch {
-            print("Inference failed")
+            print("Inference error: \(error.localizedDescription)")
+            messages.append(ChatMessage(role: "assistant", content: "Sorry, I had a brain fart. (Inference Error)"))
         }
         isThinking = false
     }
