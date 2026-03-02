@@ -1,25 +1,24 @@
 import SwiftUI
 import Foundation
-import Observation
+import Combine
 import Darwin
 import MLX
 import MLXLLM
 import MLXLMCommon
 
 @MainActor
-@Observable
-public class JosieBrain {
+public class JosieBrain: ObservableObject {
     
-    public var messages: [ChatMessage] = []
-    public var isThinking = false
-    public var availableModels: [String] = []
-    public var activeModelName: String = "None"
-    public var memoryUsage: String = "0 MB"
+    @Published public var messages: [ChatMessage] = []
+    @Published public var isThinking = false
+    @Published public var availableModels: [String] = []
+    @Published public var activeModelName: String = "None"
+    @Published public var memoryUsage: String = "0 MB"
 
     private var modelContainer: ModelContainer?
     private var chatSession: ChatSession?
 
-    public struct ChatMessage: Identifiable, Sendable {
+    public struct ChatMessage: Identifiable {
         public let id = UUID()
         public let role: String
         public let content: String
@@ -38,9 +37,7 @@ public class JosieBrain {
 
     private func startMemoryMonitor() {
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.updateMemoryUsage()
-            }
+            self?.updateMemoryUsage()
         }
     }
 
@@ -66,7 +63,7 @@ public class JosieBrain {
         }
     }
 
-    // MARK: - Model Handling
+    // MARK: - Models
 
     public func refreshModels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -121,7 +118,7 @@ public class JosieBrain {
 
     public func send(
         _ prompt: String,
-        onResponse: @escaping @MainActor (String) -> Void
+        onResponse: @escaping (String) -> Void
     ) async {
         guard let session = chatSession else { return }
 
@@ -147,7 +144,7 @@ public class JosieBrain {
     // MARK: - Reset
 
     public func resetBrain() {
-        Task { @MainActor in
+        Task {
             await chatSession?.clear()
             messages.removeAll()
             isThinking = false
