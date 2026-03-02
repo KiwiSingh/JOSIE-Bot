@@ -9,11 +9,16 @@ import MLXLMCommon
 @MainActor
 public class JosieBrain: ObservableObject {
     
+    // MARK: - Published State
+    
     @Published public var messages: [ChatMessage] = []
     @Published public var isThinking = false
     @Published public var availableModels: [String] = []
     @Published public var activeModelName: String = "None"
     @Published public var memoryUsage: String = "0 MB"
+    
+    // NEW: user-visible error
+    @Published public var lastError: String? = nil
 
     private var modelContainer: ModelContainer?
     private var chatSession: ChatSession?
@@ -63,7 +68,7 @@ public class JosieBrain: ObservableObject {
         }
     }
 
-    // MARK: - Models
+    // MARK: - Model Discovery
 
     public func refreshModels() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -77,12 +82,28 @@ public class JosieBrain: ObservableObject {
         availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
     }
 
+    // MARK: - Model Loading (User-Facing Errors)
+
     public func loadModel(_ name: String) async {
         isThinking = true
         activeModelName = "Loading..."
+        lastError = nil
 
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
+        let modelURL = docs
+            .appendingPathComponent("Models")
+            .appendingPathComponent(name)
+
+        var isDir: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: modelURL.path, isDirectory: &isDir)
+
+        if !exists || !isDir.boolValue {
+            lastError = "Model folder not found at:\n\(modelURL.lastPathComponent)"
+            activeModelName = "Load Failed"
+            isThinking = false
+            return
+        }
+
         let config = ModelConfiguration(id: modelURL.path)
 
         do {
@@ -107,8 +128,21 @@ public class JosieBrain: ObservableObject {
             )
 
             activeModelName = name
+
         } catch {
             activeModelName = "Load Failed"
+            
+            // Make error readable for humans
+            let readable = error.localizedDescription.isEmpty
+                ? String(describing: error)
+                : error.localizedDescription
+
+            lastError = """
+            Failed to load model "\(name)".
+
+            Reason:
+            \(readable)
+            """
         }
 
         isThinking = false
@@ -120,7 +154,10 @@ public class JosieBrain: ObservableObject {
         _ prompt: String,
         onResponse: @escaping (String) -> Void
     ) async {
-        guard let session = chatSession else { return }
+        guard let session = chatSession else {
+            lastError = "No active model loaded."
+            return
+        }
 
         isThinking = true
         messages.append(ChatMessage(role: "user", content: prompt))
@@ -130,10 +167,16 @@ public class JosieBrain: ObservableObject {
             messages.append(ChatMessage(role: "assistant", content: response))
             onResponse(response)
         } catch {
+            let readable = error.localizedDescription.isEmpty
+                ? String(describing: error)
+                : error.localizedDescription
+
+            lastError = "Response error:\n\(readable)"
+
             messages.append(
                 ChatMessage(
                     role: "assistant",
-                    content: "Error: \(error.localizedDescription)"
+                    content: "Error: \(readable)"
                 )
             )
         }
@@ -148,6 +191,7 @@ public class JosieBrain: ObservableObject {
             await chatSession?.clear()
             messages.removeAll()
             isThinking = false
+            lastError = nil
         }
     }
 
