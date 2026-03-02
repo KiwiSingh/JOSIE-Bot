@@ -1,3 +1,4 @@
+import SwiftUI
 struct ModelPickerView: View {
   @Bindable var brain: JosieBrain
   @Environment(\.dismiss) var dismiss
