@@ -8,6 +8,7 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - JOSIEApp
+      - path: JOSIEApp/Assets.xcassets # CRUCIAL: This tells Xcode to actually include your icons
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.kiwisingh.josie
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -24,4 +25,4 @@ targets:
 packages:
   mlx-swift-lm:
     url: https://github.com/ml-explore/mlx-swift-lm
-    branch: main # This bypasses the version mismatch error
+    branch: main
