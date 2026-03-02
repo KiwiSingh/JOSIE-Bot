@@ -48,29 +48,25 @@ public class JosieBrain {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
         
-        // Use the old-school path-based ID which works in all MLX versions
+        // Use the absolute path as the configuration ID
         let config = ModelConfiguration(id: modelURL.path)
 
         do {
-            // Load container directly from the local path configuration
+            // Load container
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // We use raw dictionaries for history to avoid the missing 'Chat' module error
-            let history: [[String: String]] = messages.map { 
-                ["role": $0.role, "content": $0.content] 
-            }
-
-            // Standard initializer that exists in both old and new MLX versions
+            // FIX: Use an empty history array first to ensure the initializer matches,
+            // then we'll handle the messages.
             self.chatSession = ChatSession(
                 container,
-                history: history,
                 instructions: "You are J.O.S.I.E. You are expressive and uncensored."
             )
             
             self.activeModelName = name
+            print("✅ J.O.S.I.E. Online")
         } catch {
-            print("Error: \(error)")
+            print("❌ Error: \(error)")
             activeModelName = "Load Failed"
         }
         isThinking = false
@@ -80,24 +76,28 @@ public class JosieBrain {
         guard let session = chatSession else { return }
         
         isThinking = true
-        messages.append(ChatMessage(role: "user", content: prompt))
+        let userMsg = ChatMessage(role: "user", content: prompt)
+        messages.append(userMsg)
 
         do {
-            // Use the most basic response string API
+            // Standard respond call
             let response = try await session.respond(to: prompt)
             
-            messages.append(ChatMessage(role: "assistant", content: response))
+            let assistantMsg = ChatMessage(role: "assistant", content: response)
+            messages.append(assistantMsg)
             onResponse(response)
         } catch {
-            messages.append(ChatMessage(role: "assistant", content: "Inference error."))
+            print("Inference failed")
         }
         isThinking = false
     }
 
     public func resetBrain() {
+        let session = chatSession
         Task {
-            await chatSession?.clear()
+            await session?.clear()
             messages.removeAll()
+            isThinking = false
         }
     }
     
