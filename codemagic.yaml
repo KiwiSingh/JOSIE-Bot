@@ -1,42 +1,27 @@
-# J.O.S.I.E. iOS Cloud Build Configuration
 workflows:
   ios-josie-build:
     name: JOSIE iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 30
-    working_directory: .
     environment:
       xcode: latest
     scripts:
-      - name: Install XcodeGen and Generate Project
+      - name: Generate Project
         script: |
           brew install xcodegen
           xcodegen generate
-      - name: Download Metal Toolchain
+      - name: Metal & Deps
         script: |
-          # Crucial for MLX GPU acceleration in 2026 Xcode environments
           xcodebuild -downloadComponent MetalToolchain
-      - name: Install Swift Package Dependencies
-        script: |
           xcodebuild -resolvePackageDependencies -project JOSIE.xcodeproj -scheme JOSIE
-      - name: Build J.O.S.I.E. (Debug)
+      - name: Build
         script: |
           xcodebuild build \
-            -project JOSIE.xcodeproj \
-            -scheme JOSIE \
-            -sdk iphoneos \
-            -configuration Debug \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_IDENTITY=""
+            -project JOSIE.xcodeproj -scheme JOSIE -sdk iphoneos -configuration Debug \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
     artifacts:
-      # 2026 FIX: Pointing to the exact DerivedData path where xcodebuild actually puts the .app
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug-iphoneos/*.app
     publishing:
       email:
         recipients:
           - kiwisingh@proton.me
-        notify:
-          success: true
-          failure: true
