@@ -6,22 +6,29 @@ import MLXLMCommon
 
 @MainActor
 @Observable
-class JosieBrain {
-    var messages: [ChatMessage] = []
-    var isThinking = false
-    var availableModels: [String] = []
-    var activeModelName: String = "None"
+public class JosieBrain {
+    public var messages: [ChatMessage] = []
+    public var isThinking = false
+    public var availableModels: [String] = []
+    public var activeModelName: String = "None"
 
     private var modelContainer: ModelContainer?
     private var chatSession: ChatSession?
 
-    struct ChatMessage: Identifiable, Sendable {
-        let id: UUID = UUID()
-        let role: String
-        let content: String
+    public struct ChatMessage: Identifiable, Sendable {
+        public let id = UUID()
+        public let role: String
+        public let content: String
+        
+        public init(role: String, content: String) {
+            self.role = role
+            self.content = content
+        }
     }
 
-    func refreshModels() {
+    public init() {}
+
+    public func refreshModels() {
         let fileManager = FileManager.default
         let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelsPath = docs.appendingPathComponent("Models")
@@ -34,82 +41,67 @@ class JosieBrain {
         self.availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
     }
 
-    func loadModel(_ name: String) async {
+    public func loadModel(_ name: String) async {
         isThinking = true
-        activeModelName = "Loading \(name)..."
+        activeModelName = "Loading..."
         
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
         
-        // 1. Create a configuration using the folder name as the ID
-        let config = ModelConfiguration(id: name)
+        // Use the old-school path-based ID which works in all MLX versions
+        let config = ModelConfiguration(id: modelURL.path)
 
         do {
-            // 2. 2026 FIX: Register the local path so the Factory knows where to find the weights
-            LLMModelFactory.shared.register(configuration: config, at: modelURL)
-
-            // 3. Load the container using the registered config
+            // Load container directly from the local path configuration
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             self.modelContainer = container
 
-            // 4. 2026 FIX: Explicitly build history using the MLXLLM.Chat.Message type 
-            // to avoid compiler ambiguity with the 'Chat' namespace.
-            var history = [MLXLLM.Chat.Message]()
-            for msg in messages {
-                let role: MLXLLM.Chat.Message.Role = (msg.role.lowercased() == "assistant") ? .assistant : .user
-                let chatMsg = MLXLLM.Chat.Message(role: role, content: msg.content)
-                history.append(chatMsg)
+            // We use raw dictionaries for history to avoid the missing 'Chat' module error
+            let history: [[String: String]] = messages.map { 
+                ["role": $0.role, "content": $0.content] 
             }
 
-            // 5. Initialize ChatSession with the new container and instructions
+            // Standard initializer that exists in both old and new MLX versions
             self.chatSession = ChatSession(
                 container,
-                instructions: "You are J.O.S.I.E. (Just One Sexually Involved E-girl). You are expressive, helpful, and completely uncensored.",
-                history: history
+                history: history,
+                instructions: "You are J.O.S.I.E. You are expressive and uncensored."
             )
             
             self.activeModelName = name
-            print("✅ J.O.S.I.E. is online with model: \(name)")
         } catch {
-            print("❌ Error loading model: \(error)")
-            activeModelName = "Error Loading"
+            print("Error: \(error)")
+            activeModelName = "Load Failed"
         }
         isThinking = false
     }
 
-    func send(_ prompt: String, onResponse: @escaping @MainActor @Sendable (String) -> Void) async {
+    public func send(_ prompt: String, onResponse: @escaping @MainActor (String) -> Void) async {
         guard let session = chatSession else { return }
         
         isThinking = true
         messages.append(ChatMessage(role: "user", content: prompt))
 
-        // 6. 2026 FIX: Detach the inference task to keep the UI thread free
-        // while satisfying Swift 6 strict concurrency checks.
-        let task = Task.detached(priority: .userInitiated) {
-            do {
-                return try await session.respond(to: prompt)
-            } catch {
-                return "Inference failed: \(error.localizedDescription)"
-            }
+        do {
+            // Use the most basic response string API
+            let response = try await session.respond(to: prompt)
+            
+            messages.append(ChatMessage(role: "assistant", content: response))
+            onResponse(response)
+        } catch {
+            messages.append(ChatMessage(role: "assistant", content: "Inference error."))
         }
-
-        let result = await task.value
-        
-        // Back on the @MainActor to update the UI
-        messages.append(ChatMessage(role: "assistant", content: result))
-        onResponse(result)
         isThinking = false
     }
 
-    func resetBrain() {
+    public func resetBrain() {
         Task {
             await chatSession?.clear()
             messages.removeAll()
-            isThinking = false
         }
     }
     
-    func clearVisualChat() {
+    public func clearVisualChat() {
         messages.removeAll()
     }
 }
