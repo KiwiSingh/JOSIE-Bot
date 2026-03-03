@@ -1,0 +1,374 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 63;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		09C53F30F35054D228C23206 /* ChatBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824DD184113801E038DE471D /* ChatBubble.swift */; };
+		1ED5D85D53DD9B8389346845 /* ModelPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C253DF76AC43162C71044EC7 /* ModelPickerView.swift */; };
+		52C17FFFFA8286F14CD29AE4 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1C1A80FCA6AEF600250AF4D1 /* MLXLMCommon */; };
+		615986835D61AF368D52CCE9 /* JOSIEApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB9385D5CD3F94D184DE01D9 /* JOSIEApp.swift */; };
+		7BA5B5F966118FC556A6151B /* JosieBrain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510C197B44D453B6B15D9C41 /* JosieBrain.swift */; };
+		B4267C0E3CF349F6FA03EE01 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F423D6BA53AA1D7011290C3D /* Extensions.swift */; };
+		BDCF1EED5927507E68039412 /* JosieVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6500EB88F8792EA83994221B /* JosieVoiceManager.swift */; };
+		CE1DBE46DE3C5F47107C818A /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 0E8092B9D9B82CED02F8F1BD /* MLXLLM */; };
+		E379626DFB6D81E3831F180F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2CB7D1D686A2F050BB6A3B72 /* Assets.xcassets */; };
+		EF571A927637BEBE01B67422 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DA55BB6CADCE4679018A446 /* ContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		2CB7D1D686A2F050BB6A3B72 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3DA55BB6CADCE4679018A446 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		424803E5E0046B6DF729EE49 /* JOSIE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JOSIE.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		510C197B44D453B6B15D9C41 /* JosieBrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JosieBrain.swift; sourceTree = "<group>"; };
+		6500EB88F8792EA83994221B /* JosieVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JosieVoiceManager.swift; sourceTree = "<group>"; };
+		824DD184113801E038DE471D /* ChatBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubble.swift; sourceTree = "<group>"; };
+		AB9385D5CD3F94D184DE01D9 /* JOSIEApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JOSIEApp.swift; sourceTree = "<group>"; };
+		C253DF76AC43162C71044EC7 /* ModelPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPickerView.swift; sourceTree = "<group>"; };
+		F423D6BA53AA1D7011290C3D /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		26FE74B2878EB6910344B55F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE1DBE46DE3C5F47107C818A /* MLXLLM in Frameworks */,
+				52C17FFFFA8286F14CD29AE4 /* MLXLMCommon in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		23C61AF869B259153690F900 = {
+			isa = PBXGroup;
+			children = (
+				C849CA8E77336E093DD9ED55 /* JOSIEApp */,
+				C0D995A4BB876A8C2ADE72C2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C0D995A4BB876A8C2ADE72C2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				424803E5E0046B6DF729EE49 /* JOSIE.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C849CA8E77336E093DD9ED55 /* JOSIEApp */ = {
+			isa = PBXGroup;
+			children = (
+				2CB7D1D686A2F050BB6A3B72 /* Assets.xcassets */,
+				824DD184113801E038DE471D /* ChatBubble.swift */,
+				3DA55BB6CADCE4679018A446 /* ContentView.swift */,
+				F423D6BA53AA1D7011290C3D /* Extensions.swift */,
+				AB9385D5CD3F94D184DE01D9 /* JOSIEApp.swift */,
+				510C197B44D453B6B15D9C41 /* JosieBrain.swift */,
+				6500EB88F8792EA83994221B /* JosieVoiceManager.swift */,
+				C253DF76AC43162C71044EC7 /* ModelPickerView.swift */,
+			);
+			path = JOSIEApp;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		993D8F2CCC66E9FA80931245 /* JOSIE */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6BE1330B2B86A6FE88842A53 /* Build configuration list for PBXNativeTarget "JOSIE" */;
+			buildPhases = (
+				BFA124402C9F4B7F05FCA1C3 /* Sources */,
+				656C8E77F8240581655990E4 /* Resources */,
+				26FE74B2878EB6910344B55F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = JOSIE;
+			packageProductDependencies = (
+				0E8092B9D9B82CED02F8F1BD /* MLXLLM */,
+				1C1A80FCA6AEF600250AF4D1 /* MLXLMCommon */,
+			);
+			productName = JOSIE;
+			productReference = 424803E5E0046B6DF729EE49 /* JOSIE.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		44E917E2F33D40B9667E2B6A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2640;
+			};
+			buildConfigurationList = DE47FC12893EB3BEA50CE4FE /* Build configuration list for PBXProject "JOSIE" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 23C61AF869B259153690F900;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				414E5FE19E9E4FF4BE4F1A4A /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+			);
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				993D8F2CCC66E9FA80931245 /* JOSIE */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		656C8E77F8240581655990E4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E379626DFB6D81E3831F180F /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BFA124402C9F4B7F05FCA1C3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				09C53F30F35054D228C23206 /* ChatBubble.swift in Sources */,
+				EF571A927637BEBE01B67422 /* ContentView.swift in Sources */,
+				B4267C0E3CF349F6FA03EE01 /* Extensions.swift in Sources */,
+				615986835D61AF368D52CCE9 /* JOSIEApp.swift in Sources */,
+				7BA5B5F966118FC556A6151B /* JosieBrain.swift in Sources */,
+				BDCF1EED5927507E68039412 /* JosieVoiceManager.swift in Sources */,
+				1ED5D85D53DD9B8389346845 /* ModelPickerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		17FEBB7B1BBA45AF4DBF8459 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = C82P865SZC;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		734F5F3B20F43F568DE7AC10 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JOSIE needs the mic.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "JOSIE needs to hear you.";
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.kiwisingh.josie;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BDB05A42F2561ECAC55A47D7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = C82P865SZC;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E6C9A88F717E2F8ED7E876C8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JOSIE needs the mic.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "JOSIE needs to hear you.";
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.kiwisingh.josie;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		6BE1330B2B86A6FE88842A53 /* Build configuration list for PBXNativeTarget "JOSIE" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				734F5F3B20F43F568DE7AC10 /* Debug */,
+				E6C9A88F717E2F8ED7E876C8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DE47FC12893EB3BEA50CE4FE /* Build configuration list for PBXProject "JOSIE" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				17FEBB7B1BBA45AF4DBF8459 /* Debug */,
+				BDB05A42F2561ECAC55A47D7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		414E5FE19E9E4FF4BE4F1A4A /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0E8092B9D9B82CED02F8F1BD /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 414E5FE19E9E4FF4BE4F1A4A /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		1C1A80FCA6AEF600250AF4D1 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 414E5FE19E9E4FF4BE4F1A4A /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLMCommon;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 44E917E2F33D40B9667E2B6A /* Project object */;
+}

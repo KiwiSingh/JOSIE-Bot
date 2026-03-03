@@ -3,9 +3,11 @@ import SwiftUI
 struct ContentView: View {
 
     @StateObject private var brain = JosieBrain()
+    @StateObject private var voiceManager = JosieVoiceManager()
     @State private var messages: [(text: String, isUser: Bool)] = []
     @State private var inputText = ""
-    @State private var selectedModel = "mlx-community/Llama-3.2-1B-Instruct-4bit"
+    @State private var selectedModel = ""
+    @State private var availableModels: [String] = []
     @State private var showModelPicker = false
 
     var body: some View {
@@ -17,20 +19,41 @@ struct ContentView: View {
                 Divider()
 
                 chatArea
-
-                Divider()
-
-                inputBar
             }
             .navigationBarHidden(true)
+            .safeAreaInset(edge: .bottom) {
+                inputBar
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Hide") {
+                        hideKeyboard()
+                    }
+                }
+            }
             .sheet(isPresented: $showModelPicker) {
                 ModelPickerView(
                     selectedModel: $selectedModel,
-                    models: [
-                        "mlx-community/Llama-3.2-1B-Instruct-4bit",
-                        "mlx-community/Gemma-2B-4bit"
-                    ]
+                    models: availableModels
                 )
+            }
+            .task {
+                let models = brain.availableLocalModels()
+                availableModels = models
+                if selectedModel.isEmpty, let first = models.first {
+                    selectedModel = first
+                }
+            }
+            .onChange(of: selectedModel) { _, newValue in
+                guard !newValue.isEmpty else { return }
+                Task {
+                    await brain.loadModel(modelName: newValue)
+                }
+            }
+            .onChange(of: voiceManager.lastTranscript) { _, newValue in
+                guard voiceManager.isListening else { return }
+                inputText = newValue
             }
         }
     }
@@ -38,34 +61,68 @@ struct ContentView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 10) {
+            Image("josie_avatar")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 28, height: 28)
+                .clipShape(Circle())
+                .accessibilityLabel("JOSIE")
+
+            VStack(alignment: .leading, spacing: 1) {
                 Text("JOSIE")
-                    .font(.title2.bold())
-                    .minimumScaleFactor(0.6)
+                    .font(.headline)
                     .lineLimit(1)
 
-                Text(selectedModel)
-                    .font(.caption)
+                Text(brain.currentModelName)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "%.0f MB", brain.memoryUsageMB))
-                    .font(.caption.monospacedDigit())
+            HStack(spacing: 6) {
+                Text(String(format: "RAM %.0f MB", brain.memoryUsageMB))
+                    .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
 
-                Button("Models") {
-                    showModelPicker = true
+                if voiceManager.voiceEnabled {
+                    Label("Voice On", systemImage: "waveform.circle.fill")
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.blue)
+                        .accessibilityLabel("Voice On")
                 }
-                .font(.caption)
+            }
+
+            Button("Models") {
+                availableModels = brain.availableLocalModels()
+                showModelPicker = true
+            }
+            .font(.caption2)
+
+            Menu {
+                Section("Voice") {
+                    Toggle("Voice On", isOn: $voiceManager.voiceEnabled)
+                }
+
+                Section("Memory") {
+                    Toggle("Low Memory", isOn: $brain.lowMemoryMode)
+                    Text(String(format: "Max %.0f MB", brain.maxMemoryMB))
+                }
+
+                Section("Model") {
+                    Text(brain.currentModelName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.caption)
             }
         }
-        .padding()
+        .padding(.horizontal)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Chat Area
@@ -84,6 +141,7 @@ struct ContentView: View {
                 }
                 .padding(.vertical)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: messages.count) { _, _ in
                 if let last = messages.indices.last {
                     withAnimation {
@@ -97,7 +155,28 @@ struct ContentView: View {
     // MARK: - Input Bar
 
     private var inputBar: some View {
-        HStack(alignment: .bottom) {
+        HStack(alignment: .bottom, spacing: 8) {
+            Button {
+                hideKeyboard()
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.title3)
+            }
+            .buttonStyle(.borderless)
+
+            Button {
+                voiceManager.toggleListening { transcript in
+                    inputText = transcript
+                    sendMessage()
+                }
+            } label: {
+                Image(systemName: voiceManager.isListening ? "mic.fill" : "mic")
+                    .font(.title3)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!voiceManager.voiceEnabled)
+            .accessibilityLabel(voiceManager.isListening ? "Stop Listening" : "Start Listening")
+
             TextField("Message...", text: $inputText, axis: .vertical)
                 .lineLimit(1...4)
                 .textFieldStyle(.roundedBorder)
@@ -109,11 +188,15 @@ struct ContentView: View {
                     .font(.title3)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || brain.isGenerating)
+            .disabled(
+                inputText.trimmingCharacters(in: .whitespaces).isEmpty ||
+                brain.isGenerating ||
+                brain.isLoading
+            )
         }
-        .padding()
+        .padding(.horizontal)
+        .padding(.vertical, 10)
         .background(.ultraThinMaterial)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     // MARK: - Actions
@@ -128,6 +211,7 @@ struct ContentView: View {
         Task {
             let reply = await brain.generate(prompt: trimmed)
             messages.append((reply, false))
+            voiceManager.speak(reply)
         }
     }
 }

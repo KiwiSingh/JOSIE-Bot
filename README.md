@@ -33,6 +33,14 @@ For the easiest experience, download the latest stable application for your plat
 
 ---
 
+## 📱 iOS Version
+
+- **Model Availability**: The iOS build currently ships with **only two models**. For the best experience, use **JosieNidum**.
+- **Model Download**: **[TBD MEGA LINK]** (link will be provided soon).
+- **Download Issues**: If you hit rate limits or download errors, use **MegaBasterd**.
+
+---
+
 ### 💻 Developer / Linux Setup
 
 If you are on Linux, or prefer running from source:

@@ -8,21 +8,34 @@ struct ModelPickerView: View {
 
     var body: some View {
         NavigationStack {
-            List(models, id: \.self) { model in
-                Button {
-                    selectedModel = model
-                    dismiss()
-                } label: {
-                    HStack {
-                        Text(model)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+            Group {
+                if models.isEmpty {
+                    VStack(spacing: 12) {
+                        Text("No local models found")
+                            .font(.headline)
+                        Text("Add models in Files > JOSIE > Models")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                } else {
+                    List(models, id: \.self) { model in
+                        Button {
+                            selectedModel = model
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(model)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
 
-                        Spacer()
+                                Spacer()
 
-                        if model == selectedModel {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.blue)
+                                if model == selectedModel {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.blue)
+                                }
+                            }
                         }
                     }
                 }
