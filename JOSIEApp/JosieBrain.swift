@@ -7,7 +7,7 @@ import MLXLMCommon
 @MainActor
 final class JosieBrain: ObservableObject {
 
-    // MARK: - Published UI State
+    // MARK: - UI State
 
     @Published var messages: [ChatMessage] = []
     @Published var isThinking: Bool = false
@@ -35,7 +35,7 @@ final class JosieBrain: ObservableObject {
         startMemoryMonitor()
     }
 
-    // MARK: - RAM Monitor
+    // MARK: - Memory Monitor
 
     private func startMemoryMonitor() {
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -48,7 +48,8 @@ final class JosieBrain: ObservableObject {
     private func updateMemoryUsage() {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(
-            MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size
+            MemoryLayout<mach_task_basic_info>.size /
+            MemoryLayout<natural_t>.size
         )
 
         let result = withUnsafeMutablePointer(to: &info) {
@@ -89,7 +90,9 @@ final class JosieBrain: ObservableObject {
         activeModelName = "Loading..."
 
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let modelURL = docs.appendingPathComponent("Models").appendingPathComponent(name)
+        let modelURL = docs
+            .appendingPathComponent("Models")
+            .appendingPathComponent(name)
 
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
             activeModelName = "Load Failed"
@@ -99,8 +102,12 @@ final class JosieBrain: ObservableObject {
         }
 
         do {
-            container = try await LLMModelFactory.shared.loadContainer(
-                directory: modelURL
+            let config = ModelConfiguration(
+                modelPath: modelURL.path
+            )
+
+            container = try await ModelFactory.shared.loadContainer(
+                configuration: config
             )
 
             session = ChatSession(container!)
@@ -118,7 +125,7 @@ final class JosieBrain: ObservableObject {
         isThinking = false
     }
 
-    // MARK: - Send Prompt
+    // MARK: - Send Message
 
     func send(_ prompt: String, onResponse: @escaping (String) -> Void) async {
         guard let session else {
