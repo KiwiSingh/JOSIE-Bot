@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var brain = JosieBrain()
-    @State private var voice = JosieVoiceManager()
+    
+    @StateObject private var brain = JosieBrain()
+    @StateObject private var voice = JosieVoiceManager()
     @State private var input = ""
     @State private var showPicker = false
 
@@ -40,7 +41,6 @@ struct ContentView: View {
             .onAppear {
                 brain.refreshModels()
             }
-            // ✅ NEW: User-facing error alert
             .alert(
                 "Model Error",
                 isPresented: Binding(
@@ -84,7 +84,7 @@ struct ContentView: View {
             Text(brain.activeModelName)
                 .font(.caption2.monospaced())
                 .foregroundColor(.pink)
-            
+
             Text("RAM: \(brain.memoryUsage)")
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundColor(.gray)
