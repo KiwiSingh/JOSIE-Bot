@@ -9,8 +9,6 @@ import MLXLMCommon
 @MainActor
 public class JosieBrain: ObservableObject {
     
-    // MARK: - Published State
-    
     @Published public var messages: [ChatMessage] = []
     @Published public var isThinking = false
     @Published public var availableModels: [String] = []
@@ -20,6 +18,7 @@ public class JosieBrain: ObservableObject {
 
     private var modelContainer: ModelContainer?
     private var chatSession: ChatSession?
+    private var memoryTimer: Timer?
 
     public struct ChatMessage: Identifiable {
         public let id = UUID()
@@ -39,7 +38,7 @@ public class JosieBrain: ObservableObject {
     // MARK: - Memory Monitor
 
     private func startMemoryMonitor() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        memoryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateMemoryUsage()
             }
@@ -110,7 +109,6 @@ public class JosieBrain: ObservableObject {
             let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
             modelContainer = container
 
-            // ✅ Correct initializer for your MLX version
             chatSession = ChatSession(container, instructions: "You are J.O.S.I.E.")
 
             activeModelName = name
