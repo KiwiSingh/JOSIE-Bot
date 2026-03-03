@@ -30,14 +30,15 @@ JOSIE is a premium, localized AI desktop application designed for immersive role
 For the easiest experience, download the latest stable application for your platform from the **[Releases](https://github.com/KiwiSingh/JOSIE-Bot/releases)** section:
 - **macOS**: `JOSIE.dmg` (Optimized for Apple Silicon).
 - **Windows**: `JOSIE.exe.zip`.
-
+- **iOS**: `JOSIE.ipa`
 ---
 
 ## 📱 iOS Version
 
-- **Model Availability**: The iOS build currently ships with **only two models**. For the best experience, use **JosieNidum**.
-- **Model Download**: **[TBD MEGA LINK]** (link will be provided soon).
+- **Model Availability**: The iOS build currently ships with only two models (**JosieQwen** and **JosieNidum**). For the best experience, use **JosieNidum**.
+- **Model Download**: Download the models [here](https://mega.nz/file/Ik0SFIpI#3_uxyZyzpcdoLw85T-lJWKwKuoiHu7NICFHUST10OG0), unzip it, and move the individual model folders into the `JOSIE/Models` folder in your Files app.
 - **Download Issues**: If you hit rate limits or download errors, use **MegaBasterd**.
+- **Installation:** Sideload the IPA using Sideloadly, AltStore, or TrollStore.
 
 ---
 
