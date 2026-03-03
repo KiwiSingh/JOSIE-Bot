@@ -1,35 +1,41 @@
 import SwiftUI
 import Foundation
-import Combine
-import Darwin
 import MLX
 import MLXLLM
 import MLXLMCommon
 
 @MainActor
-public class JosieBrain: ObservableObject {
-    
-    @Published public var messages: [ChatMessage] = []
-    @Published public var isThinking = false
-    @Published public var availableModels: [String] = []
-    @Published public var activeModelName: String = "None"
-    @Published public var memoryUsage: String = "0 MB"
-    @Published public var lastError: String? = nil
+@Observable
+public class JosieBrain {
+
+    // MARK: - Public State
+
+    public var messages: [ChatMessage] = []
+    public var isThinking = false
+    public var availableModels: [String] = []
+    public var activeModelName: String = "None"
+    public var memoryUsage: String = "0 MB"
+    public var lastError: String? = nil
+
+    // MARK: - MLX Internals
 
     private var modelContainer: ModelContainer?
     private var chatSession: ChatSession?
-    private var memoryTimer: Timer?
 
-    public struct ChatMessage: Identifiable {
+    // MARK: - Chat Message Model
+
+    public struct ChatMessage: Identifiable, Sendable {
         public let id = UUID()
         public let role: String
         public let content: String
-        
+
         public init(role: String, content: String) {
             self.role = role
             self.content = content
         }
     }
+
+    // MARK: - Init
 
     public init() {
         startMemoryMonitor()
@@ -38,7 +44,7 @@ public class JosieBrain: ObservableObject {
     // MARK: - Memory Monitor
 
     private func startMemoryMonitor() {
-        memoryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateMemoryUsage()
             }
@@ -81,7 +87,7 @@ public class JosieBrain: ObservableObject {
         availableModels = folders?.filter { !$0.hasPrefix(".") } ?? []
     }
 
-    // MARK: - Model Loading
+    // MARK: - Model Loading (Modern MLX)
 
     public func loadModel(_ name: String) async {
         isThinking = true
@@ -93,25 +99,23 @@ public class JosieBrain: ObservableObject {
             .appendingPathComponent("Models")
             .appendingPathComponent(name)
 
-        var isDir: ObjCBool = false
-        let exists = FileManager.default.fileExists(atPath: modelURL.path, isDirectory: &isDir)
-
-        if !exists || !isDir.boolValue {
-            lastError = "Model folder not found: \(name)"
+        guard FileManager.default.fileExists(atPath: modelURL.path) else {
             activeModelName = "Load Failed"
+            lastError = "Model folder not found at:\n\(modelURL.path)"
             isThinking = false
             return
         }
 
-        let config = ModelConfiguration(id: modelURL.path)
-
         do {
-            let container = try await LLMModelFactory.shared.loadContainer(configuration: config)
-            modelContainer = container
+            let container = try await LLMModelFactory.shared.loadContainer(
+                directory: modelURL
+            )
 
-            chatSession = ChatSession(container, instructions: "You are J.O.S.I.E.")
+            modelContainer = container
+            chatSession = ChatSession(container)
 
             activeModelName = name
+
         } catch {
             activeModelName = "Load Failed"
 
@@ -133,10 +137,11 @@ public class JosieBrain: ObservableObject {
 
     public func send(
         _ prompt: String,
-        onResponse: @escaping (String) -> Void
+        onResponse: @escaping @MainActor (String) -> Void
     ) async {
+
         guard let session = chatSession else {
-            lastError = "No active model loaded."
+            lastError = "No model loaded."
             return
         }
 
@@ -145,14 +150,17 @@ public class JosieBrain: ObservableObject {
 
         do {
             let response = try await session.respond(to: prompt)
-            messages.append(ChatMessage(role: "assistant", content: response))
+
+            messages.append(
+                ChatMessage(role: "assistant", content: response)
+            )
+
             onResponse(response)
+
         } catch {
             let readable = error.localizedDescription.isEmpty
                 ? String(describing: error)
                 : error.localizedDescription
-
-            lastError = "Response error:\n\(readable)"
 
             messages.append(
                 ChatMessage(
@@ -160,6 +168,8 @@ public class JosieBrain: ObservableObject {
                     content: "Error: \(readable)"
                 )
             )
+
+            lastError = readable
         }
 
         isThinking = false
@@ -172,7 +182,6 @@ public class JosieBrain: ObservableObject {
             await chatSession?.clear()
             messages.removeAll()
             isThinking = false
-            lastError = nil
         }
     }
 
