@@ -1,26 +1,30 @@
 import SwiftUI
 
 struct ChatBubble: View {
-    let msg: JosieBrain.ChatMessage
+    let message: String
+    let isUser: Bool
 
     var body: some View {
-        HStack {
-            if msg.role == "user" { Spacer() }
-            
-            Text(msg.content)
+        HStack(alignment: .bottom) {
+            if isUser { Spacer(minLength: 40) }
+
+            Text(message)
+                .font(.body)
+                .multilineTextAlignment(.leading)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(12)
                 .background(
-                    // J.O.S.I.E. Theme: Pink for user, Dark Glass for J.O.S.I.E.
-                    msg.role == "user" ? Color.pink.opacity(0.8) : Color.white.opacity(0.1)
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(isUser ? Color.blue : Color.gray.opacity(0.2))
                 )
-                // 2026 FIX: Use clipShape instead of cornerRadius
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .foregroundColor(.white)
-                // Align multiline text within the bubble
-                .multilineTextAlignment(msg.role == "user" ? .trailing : .leading)
-                .frame(maxWidth: 280, alignment: msg.role == "user" ? .trailing : .leading)
-            
-            if msg.role == "assistant" { Spacer() }
+                .foregroundStyle(isUser ? .white : .primary)
+                .frame(maxWidth: 500, alignment: isUser ? .trailing : .leading)
+
+            if !isUser { Spacer(minLength: 40) }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal)
+        .padding(.vertical, 4)
     }
 }

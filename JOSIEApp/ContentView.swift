@@ -1,160 +1,133 @@
 import SwiftUI
 
 struct ContentView: View {
-    
+
     @StateObject private var brain = JosieBrain()
-    @StateObject private var voice = JosieVoiceManager()
-    @State private var input = ""
-    @State private var showPicker = false
+    @State private var messages: [(text: String, isUser: Bool)] = []
+    @State private var inputText = ""
+    @State private var selectedModel = "mlx-community/Llama-3.2-1B-Instruct-4bit"
+    @State private var showModelPicker = false
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(hex: "#0D0D0D").ignoresSafeArea()
+            VStack(spacing: 0) {
 
-                VStack(spacing: 0) {
-                    headerView
+                header
 
-                    ScrollViewReader { proxy in
-                        List(brain.messages) { msg in
-                            ChatBubble(msg: msg)
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .id(msg.id)
-                        }
-                        .listStyle(.plain)
-                        .onChange(of: brain.messages.count) { _, _ in
-                            if let lastId = brain.messages.last?.id {
-                                withAnimation {
-                                    proxy.scrollTo(lastId, anchor: .bottom)
-                                }
-                            }
-                        }
-                    }
+                Divider()
 
-                    controlView
-                }
+                chatArea
+
+                Divider()
+
+                inputBar
             }
-            .sheet(isPresented: $showPicker) {
-                ModelPickerView(brain: brain)
-            }
-            .onAppear {
-                brain.refreshModels()
-            }
-            .alert(
-                "Model Error",
-                isPresented: Binding(
-                    get: { brain.lastError != nil },
-                    set: { _ in brain.lastError = nil }
+            .navigationBarHidden(true)
+            .sheet(isPresented: $showModelPicker) {
+                ModelPickerView(
+                    selectedModel: $selectedModel,
+                    models: [
+                        "mlx-community/Llama-3.2-1B-Instruct-4bit",
+                        "mlx-community/Gemma-2B-4bit"
+                    ]
                 )
-            ) {
-                Button("OK", role: .cancel) {
-                    brain.lastError = nil
-                }
-            } message: {
-                Text(brain.lastError ?? "")
             }
         }
     }
 
-    var headerView: some View {
-        VStack {
-            HStack {
-                Button { showPicker = true } label: {
-                    Image(systemName: "cpu")
-                        .foregroundColor(.pink)
-                }
+    // MARK: - Header
 
-                Spacer()
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("JOSIE")
+                    .font(.title2.bold())
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
 
-                Button { voice.isMuted.toggle() } label: {
-                    Image(systemName: voice.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .foregroundColor(voice.isMuted ? .gray : .pink)
-                }
+                Text(selectedModel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
-            .padding()
 
-            Image("josie_avatar")
-                .resizable()
-                .frame(width: 85, height: 85)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.pink, lineWidth: 2))
-                .shadow(color: .pink.opacity(brain.isThinking ? 0.9 : 0.2), radius: 10)
+            Spacer()
 
-            Text(brain.activeModelName)
-                .font(.caption2.monospaced())
-                .foregroundColor(.pink)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "%.0f MB", brain.memoryUsageMB))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
 
-            Text("RAM: \(brain.memoryUsage)")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.gray)
+                Button("Models") {
+                    showModelPicker = true
+                }
+                .font(.caption)
+            }
         }
+        .padding()
     }
 
-    var controlView: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button("🗑️ Clear") {
-                    brain.clearVisualChat()
-                }
-                .font(.caption)
-                .foregroundColor(.gray)
+    // MARK: - Chat Area
 
-                Spacer()
-
-                Button("🧠 Reset") {
-                    brain.resetBrain()
-                }
-                .font(.caption)
-                .foregroundColor(.gray)
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
-
-            HStack(spacing: 12) {
-                Button {
-                    voice.toggleListening { input = $0 }
-                } label: {
-                    Image(systemName: voice.isListening ? "stop.circle.fill" : "mic.fill")
-                        .foregroundColor(voice.isListening ? .red : .white)
-                        .font(.title2)
-                }
-
-                TextField("Message JOSIE...", text: $input)
-                    .padding(10)
-                    .background(Capsule().fill(.white.opacity(0.1)))
-                    .foregroundColor(.white)
-                    .submitLabel(.send)
-                    .onSubmit {
-                        performSend()
+    private var chatArea: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
+                        ChatBubble(
+                            message: message.text,
+                            isUser: message.isUser
+                        )
+                        .id(index)
                     }
-
-                Button {
-                    performSend()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title)
-                        .foregroundColor(input.isEmpty ? .gray : .pink)
                 }
-                .disabled(input.isEmpty || brain.isThinking)
+                .padding(.vertical)
             }
-            .padding()
+            .onChange(of: messages.count) { _, _ in
+                if let last = messages.indices.last {
+                    withAnimation {
+                        proxy.scrollTo(last, anchor: .bottom)
+                    }
+                }
+            }
         }
-        .background(Color.black.ignoresSafeArea(edges: .bottom))
     }
 
-    private func performSend() {
-        guard !input.isEmpty else { return }
+    // MARK: - Input Bar
 
-        let prompt = input
-        input = ""
+    private var inputBar: some View {
+        HStack(alignment: .bottom) {
+            TextField("Message...", text: $inputText, axis: .vertical)
+                .lineLimit(1...4)
+                .textFieldStyle(.roundedBorder)
+
+            Button {
+                sendMessage()
+            } label: {
+                Image(systemName: "paperplane.fill")
+                    .font(.title3)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || brain.isGenerating)
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    // MARK: - Actions
+
+    private func sendMessage() {
+        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        messages.append((trimmed, true))
+        inputText = ""
 
         Task {
-            await brain.send(prompt) { response in
-                if !voice.isMuted {
-                    voice.speak(response)
-                }
-            }
+            let reply = await brain.generate(prompt: trimmed)
+            messages.append((reply, false))
         }
     }
 }
