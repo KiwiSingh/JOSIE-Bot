@@ -20,6 +20,7 @@ final class JosieBrain: ObservableObject {
 
     private var container: ModelContainer?
     private var session: ChatSession?
+    private let factory = ModelFactory()
 
     // MARK: - Message Model
 
@@ -29,13 +30,11 @@ final class JosieBrain: ObservableObject {
         let content: String
     }
 
-    // MARK: - Init
-
     init() {
         startMemoryMonitor()
     }
 
-    // MARK: - Memory Monitor
+    // MARK: - RAM Monitor
 
     private func startMemoryMonitor() {
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -103,10 +102,10 @@ final class JosieBrain: ObservableObject {
 
         do {
             let config = ModelConfiguration(
-                modelPath: modelURL.path
+                directory: modelURL
             )
 
-            container = try await ModelFactory.shared.loadContainer(
+            container = try await factory.loadContainer(
                 configuration: config
             )
 
@@ -125,7 +124,7 @@ final class JosieBrain: ObservableObject {
         isThinking = false
     }
 
-    // MARK: - Send Message
+    // MARK: - Send Prompt
 
     func send(_ prompt: String, onResponse: @escaping (String) -> Void) async {
         guard let session else {
