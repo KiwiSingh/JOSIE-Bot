@@ -20,7 +20,7 @@ final class JosieBrain: ObservableObject {
 
     private var container: ModelContainer?
     private var session: ChatSession?
-    private let factory = ModelFactory()
+    private let factory = DefaultModelFactory()
 
     // MARK: - Message Model
 
@@ -101,9 +101,7 @@ final class JosieBrain: ObservableObject {
         }
 
         do {
-            let config = ModelConfiguration(
-                directory: modelURL
-            )
+            let config = ModelConfiguration(directory: modelURL)
 
             container = try await factory.loadContainer(
                 configuration: config
@@ -137,10 +135,8 @@ final class JosieBrain: ObservableObject {
 
         do {
             let reply = try await session.respond(to: prompt)
-
             messages.append(ChatMessage(role: "assistant", content: reply))
             onResponse(reply)
-
         } catch {
             let err = error.localizedDescription
             messages.append(ChatMessage(role: "assistant", content: "Error: \(err)"))
