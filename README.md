@@ -31,6 +31,7 @@ For the easiest experience, download the latest stable application for your plat
 - **macOS**: `JOSIE.dmg` (Optimized for Apple Silicon).
 - **Windows**: `JOSIE.exe.zip`.
 - **iOS**: `JOSIE.ipa`
+- **Android:** `JOSIE.apk`
 ---
 
 ## 📱 iOS Version
@@ -39,6 +40,14 @@ For the easiest experience, download the latest stable application for your plat
 - **Model Download**: Download the models as a zip file [here](https://mega.nz/file/Ik0SFIpI#3_uxyZyzpcdoLw85T-lJWKwKuoiHu7NICFHUST10OG0), unzip it, and move the individual model folders into the `JOSIE/Models` folder in your Files app.
 - **Download Issues**: If you hit rate limits or download errors, use **[MegaBasterd](https://github.com/tonikelope/megabasterd)**.
 - **Installation:** Sideload the IPA using Sideloadly, AltStore, or TrollStore.
+
+---
+
+## 📱 Android Version
+- **Model Availability**: The Android build currently caches 3.8B, 4B, 8B and 12B model URLs from HuggingFace. These include **Phi-3.5-Mini**, **Gemma-3-4B (uncensored)**, **Stheno-8B**, and **Violet-Lotus-12B**. When in doubt, use **Gemma-3-4B**. **Stheno** and other higher parameter count models will only run on high-end flagship Android devices with plenty of RAM (ideally 12 gigs or higher) 
+- **Model Download**: When you select a model from inside the app for the first time, it downloads directly from HuggingFace, and is cached until you delete app data or completely uninstall the app.
+- **TTS and STT:** While STT remains largely untested, it should definitely work, outside of sandboxed environments like Android emulators or AVDs. TTS works perfectly. Once J.O.S.I.E finishes a sentence, she begins speaking. You can turn off speech entirely from the settings menu in the app. Unlike the iOS build, TTS and STT are decoupled, so you can enjoy one without the other, if you so desire.
+- **Installation:** Turn on installation from unknown sources in your device's settings, and install the APK. If Google Play Protect gives you any grief, ignore the inane warnings and proceed anyway.
 
 ---
 
@@ -120,10 +129,10 @@ JOSIE includes a resilient build engine for Windows:
 ## 🛠️ Tech Stack
 
 - **GUI**: Tkinter with PIL (Pillow) integration.
-- **LLM Backend**: Ollama API.
-- **TTS**: Microsoft Edge TTS (edge-tts).
+- **LLM Backend**: Ollama API, MLXLLM (iOS) and Llama.CPP (Android)
+- **TTS**: Microsoft Edge TTS (edge-tts), on-device speech models (Android and iOS).
 - **STT**: Apple Native Speech Framework (macOS) / SpeechRecognition (Generic).
-- **Packaging**: PyInstaller (using `JOSIE.spec`).
+- **Packaging**: PyInstaller (using `JOSIE.spec`), build script (Windows), decrypted and unsigned IPA (iOS), APK file (Android)
 
 ---
 
@@ -132,4 +141,9 @@ JOSIE includes a resilient build engine for Windows:
 JOSIE is released under the **MIT License**. See [LICENSE.md](LICENSE.md) for details.
 
 ---
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/kiwisingh)
+
+---
+
 <p align="center">Made with ❤️ for the Local AI Community.</p>
