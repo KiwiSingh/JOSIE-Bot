@@ -109,7 +109,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   int last_eval_idx = 0;
   if (n_decode > 0) {
-    const int chunk_size = 32;
+    const int chunk_size = 512;
     for (int i = 0; i < n_decode; i += chunk_size) {
       int n_eval = std::min(chunk_size, n_decode - i);
       llama_batch batch = llama_batch_init(n_eval, 0, 1);
