@@ -46,7 +46,7 @@ For the easiest experience, download the latest stable application for your plat
 ## 📱 Android Version
 - **Model Availability**: The Android build currently caches 3.8B, 4B, 8B and 12B model URLs from HuggingFace. These include **Phi-3.5-Mini**, **Gemma-3-4B (uncensored)**, **Stheno-8B**, and **Violet-Lotus-12B**. When in doubt, use **Gemma-3-4B**. **Stheno** and other higher parameter count models will only run on high-end flagship Android devices with plenty of RAM (ideally 12 gigs or higher) 
 - **Model Download**: When you select a model from inside the app for the first time, it downloads directly from HuggingFace, and is cached until you delete app data or completely uninstall the app.
-- **TTS and STT:** While STT remains largely untested, it should definitely work, outside of sandboxed environments like Android emulators or AVDs. TTS works perfectly. Once J.O.S.I.E finishes a sentence, she begins speaking. You can turn off speech entirely from the settings menu in the app. Unlike the iOS build, TTS and STT are decoupled, so you can enjoy one without the other, if you so desire.
+- **TTS and STT:** STT works perfectly, provided you are not using a sandboxed environment like an Android emulator or an AVD. TTS works perfectly as well. Once J.O.S.I.E finishes a sentence, she begins speaking. You can turn off speech entirely from the settings menu in the app. Unlike the iOS build, TTS and STT are decoupled, so you can enjoy one without the other, if you so desire.
 - **Installation:** Turn on installation from unknown sources in your device's settings, and install the APK. If Google Play Protect gives you any grief, ignore the inane warnings and proceed anyway.
 
 ---
