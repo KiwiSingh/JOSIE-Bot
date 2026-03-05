@@ -317,7 +317,6 @@ final class JosieBrain: ObservableObject {
                 kvGroupSize: 64,
                 quantizedKVStart: 0,
                 temperature: 0.8,
-                minP: 0.05,
                 repetitionPenalty: 1.05,
                 repetitionContextSize: 512
             )
