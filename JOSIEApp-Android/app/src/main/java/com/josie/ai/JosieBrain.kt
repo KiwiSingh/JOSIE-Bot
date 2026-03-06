@@ -207,7 +207,10 @@ class JosieBrain(application: Application) : AndroidViewModel(application) {
                 try {
                     val prompt = buildPrompt(text)
                     llamaNative.generateStream(prompt, object : LlamaNative.StreamCallback {
-                        override fun onToken(token: String) {
+                        override fun onToken(bytes: ByteArray) {
+                            // Decode with REPLACE so malformed UTF-8 bytes (byte-fallback tokens)
+                            // never crash the app — they render as the Unicode replacement char instead.
+                            val token = String(bytes, Charsets.UTF_8)
                             Log.v(TAG, "Token received: [${token.replace("\n", "\\n")}]")
                             tokenChannel.trySend(token)
                         }

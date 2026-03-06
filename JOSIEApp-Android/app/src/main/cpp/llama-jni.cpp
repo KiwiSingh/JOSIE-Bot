@@ -25,32 +25,44 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
     llama_backend_init();
     is_backend_initialized = true;
   }
+  LOGI("Step 1: backend init done, loading model file...");
 
   auto mparams = llama_model_default_params();
   model = llama_model_load_from_file(path, mparams);
 
   if (!model) {
-    LOGE("Failed to load model from %s", path);
+    LOGE("Step 2: Failed to load model from %s", path);
     env->ReleaseStringUTFChars(model_path, path);
     return JNI_FALSE;
   }
 
+  LOGI("Step 2: model pointer = %p, allocating context...", model);
+
   auto cparams = llama_context_default_params();
-  cparams.n_ctx = 2048;
-  cparams.n_batch = 1024;
-  cparams.n_ubatch = 512; // Standard physical batch limit
+  cparams.n_ctx = 1024;    // Reduced from 2048 to avoid OOM on mid-range devices
+  cparams.n_batch = 512;   // Reduced from 1024
+  cparams.n_ubatch = 256;  // Reduced from 512
 
   unsigned int cores = std::thread::hardware_concurrency();
   cparams.n_threads = std::max(1u, cores / 2);
   cparams.n_threads_batch = std::max(1u, cores);
-  LOGI("Context parameters: threads=%d/%d, ctx=%d, ubatch=%d",
+  LOGI("Context parameters: threads=%d/%d, ctx=%d, batch=%d, ubatch=%d",
        cparams.n_threads, cparams.n_threads_batch, cparams.n_ctx,
-       cparams.n_ubatch);
+       cparams.n_batch, cparams.n_ubatch);
 
   ctx = llama_init_from_model(model, cparams);
 
   env->ReleaseStringUTFChars(model_path, path);
-  return ctx != nullptr ? JNI_TRUE : JNI_FALSE;
+
+  if (!ctx) {
+    LOGE("Step 3: llama_init_from_model failed — freeing model to avoid leak");
+    llama_model_free(model);
+    model = nullptr;
+    return JNI_FALSE;
+  }
+
+  LOGI("Step 3: ctx pointer = %p — load complete", ctx);
+  return JNI_TRUE;
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
@@ -63,8 +75,9 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   const char *p_str = env->GetStringUTFChars(prompt, nullptr);
   int p_bytes = strlen(p_str);
 
-  // Tokenization
-  const int n_tokens_max = p_bytes + 4;
+  // Use a generous fixed buffer — p_bytes alone is not a safe upper bound
+  // because llama_tokenize adds special tokens and p_bytes is UTF-8 bytes, not chars.
+  const int n_tokens_max = p_bytes / 2 + 64;
   std::vector<llama_token> tokens(n_tokens_max);
   int n_tokens = llama_tokenize(llama_model_get_vocab(model), p_str, p_bytes,
                                 tokens.data(), tokens.size(), true, true);
@@ -157,8 +170,9 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   // 4. Sample (Distribution)
   llama_sampler_chain_add(smpl, llama_sampler_init_dist(time(NULL)));
   jclass callbackClass = env->GetObjectClass(callback);
+  // Signature updated: onToken now receives a byte[] to safely handle non-UTF-8 token pieces
   jmethodID onTokenMethod =
-      env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)V");
+      env->GetMethodID(callbackClass, "onToken", "([B)V");
 
   int n_cur = tokens.size();
   int n_gen = 0;
@@ -185,10 +199,14 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
     int n_chars = llama_token_to_piece(llama_model_get_vocab(model), id, piece,
                                        sizeof(piece), 0, false);
     if (n_chars > 0) {
-      std::string s(piece, n_chars);
-      jstring jword = env->NewStringUTF(s.c_str());
-      env->CallVoidMethod(callback, onTokenMethod, jword);
-      env->DeleteLocalRef(jword);
+      // NewStringUTF will abort if piece contains invalid UTF-8 bytes (e.g. byte-fallback
+      // tokens). Send as a raw byte array instead and decode safely on the Kotlin side.
+      jbyteArray jbytes = env->NewByteArray(n_chars);
+      env->SetByteArrayRegion(jbytes, 0, n_chars, reinterpret_cast<const jbyte*>(piece));
+      jstring jword = static_cast<jstring>(
+          env->CallObjectMethod(callback, onTokenMethod, jbytes));
+      env->DeleteLocalRef(jbytes);
+      (void)jword; // Return value unused; onToken is void — suppress warning
     }
 
     // Keep cache synchronized with generated output

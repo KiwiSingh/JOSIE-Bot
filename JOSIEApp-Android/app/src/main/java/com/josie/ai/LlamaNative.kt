@@ -8,7 +8,9 @@ class LlamaNative {
     }
 
     interface StreamCallback {
-        fun onToken(token: String)
+        // Receives raw bytes from llama_token_to_piece — may not be valid UTF-8.
+        // Decode with Charsets.UTF_8 + REPLACE to safely handle byte-fallback tokens.
+        fun onToken(bytes: ByteArray)
     }
 
     external fun loadModel(modelPath: String): Boolean
