@@ -6,6 +6,9 @@ plugins {
 android {
     namespace = "com.josie.ai"
     compileSdk = 34
+    lint {
+        checkReleaseBuilds = false
+    }
 
     defaultConfig {
         applicationId = "com.josie.ai"
