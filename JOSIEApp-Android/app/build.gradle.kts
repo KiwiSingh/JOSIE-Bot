@@ -6,9 +6,6 @@ plugins {
 android {
     namespace = "com.josie.ai"
     compileSdk = 34
-    lint {
-    checkReleaseBuilds = false
-}
 
     defaultConfig {
         applicationId = "com.josie.ai"
@@ -17,8 +14,8 @@ android {
         // stub until API level 29. API 26 only covers Vulkan 1.0.
         minSdk = 29
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 1
+        versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -30,58 +27,40 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "kiwi.jks")
-            storePassword = System.getenv("KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("KEY_ALIAS")
-            keyPassword = System.getenv("KEY_PASSWORD")
-        }
-    }
-
     buildTypes {
         debug {
             // Vulkan is disabled for AVD/emulator stability.
             // CPU-only inference is expected to be slow on emulators — this is unavoidable.
-            // WARNING: do not sideload this variant on a real device and expect GPU acceleration.
             externalNativeBuild {
                 cmake {
                     cppFlags += "-std=c++17"
                     arguments += "-DGGML_VULKAN=OFF"
-                    arguments += "-DCMAKE_BUILD_TYPE=Debug"
                     arguments += "-DANDROID_EMULATOR_BUILD=ON"
                 }
             }
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
-
+            // Vulkan enabled for GPU-accelerated inference on real devices.
+            // ARM dot-product and FP16 intrinsics give a significant additional
+            // speedup on Snapdragon 8xx, Dimensity 9xxx, and Exynos 2xxx SoCs.
             externalNativeBuild {
                 cmake {
+                    // Note: -ffast-math is intentionally NOT used here.
+                    // ggml's vec.h explicitly rejects -ffinite-math-only (implied by -ffast-math)
+                    // because it uses NaN/Inf checks internally. Use -fno-finite-math-only instead,
+                    // which still enables most fast-math optimizations safely.
                     cppFlags += "-std=c++17 -O3 -march=armv8-a+dotprod+fp16 -fno-finite-math-only"
                     arguments += "-DGGML_VULKAN=ON"
-                    arguments += "-DCMAKE_BUILD_TYPE=Release"
-                    arguments += "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG"
-
-                    // --- THE FIX: Robust NDK Shader Compiler Pathing ---
-                    // This detects if we are on your Mac (darwin) or GitHub Actions (linux)
-                    // and uses the compiler bundled with the Android NDK.
-                    val ndkDir = android.ndkDirectory.absolutePath
-                    val osName = System.getProperty("os.name").lowercase()
-                    val hostTag = if (osName.contains("mac")) "darwin-x86_64" else "linux-x86_64"
-                    val glslcPath = "$ndkDir/shader-tools/$hostTag/glslc"
-                    
-                    arguments += "-DVulkan_GLSLC_EXECUTABLE=$glslcPath"
+                    // The Android SDK's isolated CMake environment cannot find glslc via PATH.
+                    // This explicitly points the Vulkan shader compiler at the Homebrew binary
+                    // so that .comp shaders are compiled to SPIR-V (.spv) at build time.
+                    // Without this, flash_attn and other Vulkan symbols are undefined at link time.
+                    arguments += "-DVulkan_GLSLC_EXECUTABLE=/opt/homebrew/bin/glslc"
                 }
             }
-            
-            ndk {
-                debugSymbolLevel = "NONE"
-            }
-}
+        }
     }
 
     compileOptions {

@@ -6,12 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
-import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
-    private val brain: JosieBrain by viewModels {
-        ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-    }
+    private val brain: JosieBrain by viewModels()
     private lateinit var modelManager: ModelManager
     private lateinit var voiceManager: JosieVoiceManager
     private lateinit var sttManager: JosieSTTManager
