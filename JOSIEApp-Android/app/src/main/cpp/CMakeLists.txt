@@ -83,19 +83,11 @@ set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 
 # ------------------------------------------------
 
-set(SHADER_HOST_CACHE "${CMAKE_BINARY_DIR}/shader-host-cache.cmake")
+find_program(Vulkan_GLSLC_EXECUTABLE glslc)
 
-if(NOT EXISTS "${SHADER_HOST_CACHE}")
-    file(WRITE "${SHADER_HOST_CACHE}"
-            "set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)\n"
-            "set(Vulkan_GLSLC_EXECUTABLE "/opt/homebrew/bin/glslc" CACHE FILEPATH "" FORCE)\n"
-    )
+if(NOT Vulkan_GLSLC_EXECUTABLE)
+    message(FATAL_ERROR "glslc not found. Install Vulkan SDK.")
 endif()
-
-set(GGML_VULKAN_SHADERS_GEN_CMAKE_CACHE_ARGS
-        "-C${SHADER_HOST_CACHE}"
-        CACHE STRING "" FORCE
-)
 
 
 # ------------------------------------------------
