@@ -23,8 +23,19 @@ jobs:
         cache: gradle
 
     - name: Install Vulkan Shader Compiler
-      # Installs the required shader tools so Ubuntu can compile your .comp files
-      run: sudo apt-get update && sudo apt-get install -y glslang-tools glslc libvulkan-dev
+      # glslc on Ubuntu comes from the LunarG Vulkan SDK, not apt.
+      # The apt package 'glslc' does not exist — installing it silently does nothing,
+      # leaving GLSLC_PATH pointing at a phantom binary and breaking shader precompilation.
+      # We install the SDK via their official script instead, which puts glslc at /usr/bin/glslc.
+      run: |
+        sudo apt-get update && sudo apt-get install -y glslang-tools libvulkan-dev wget
+        # Install LunarG Vulkan SDK to get the real glslc binary
+        wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list \
+          https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+        sudo apt-get update && sudo apt-get install -y vulkan-sdk
+        # Verify glslc is now actually present before we proceed
+        which glslc && glslc --version
 
     - name: Inject Vulkan C++ Headers into Android NDK
       run: |

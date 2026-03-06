@@ -40,16 +40,19 @@ android {
         debug {
             // Vulkan is disabled for AVD/emulator stability.
             // CPU-only inference is expected to be slow on emulators — this is unavoidable.
+            // WARNING: do not sideload this variant on a real device and expect GPU acceleration.
             externalNativeBuild {
                 cmake {
                     cppFlags += "-std=c++17"
                     arguments += "-DGGML_VULKAN=OFF"
+                    arguments += "-DCMAKE_BUILD_TYPE=Debug"
                     arguments += "-DANDROID_EMULATOR_BUILD=ON"
                 }
             }
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
             
@@ -65,11 +68,18 @@ android {
                     // which still enables most fast-math optimizations safely.
                     cppFlags += "-std=c++17 -O3 -march=armv8-a+dotprod+fp16 -fno-finite-math-only"
                     arguments += "-DGGML_VULKAN=ON"
-                    
+                    arguments += "-DCMAKE_BUILD_TYPE=Release"
+                    arguments += "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG"
+
                     // Dynamically routes glslc for macOS (local) or Ubuntu (GitHub Actions)
                     val glslcPath = System.getenv("GLSLC_PATH") ?: "/opt/homebrew/bin/glslc"
                     arguments += "-DVulkan_GLSLC_EXECUTABLE=$glslcPath"
                 }
+            }
+            // Strip native debug symbols from the release APK.
+            // Without this the .so files retain full DWARF info — a major contributor to 4x size.
+            ndk {
+                debugSymbolLevel = "NONE"
             }
         }
     }
