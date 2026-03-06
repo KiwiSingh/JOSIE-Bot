@@ -28,6 +28,7 @@ JOSIE is a premium, localized AI desktop application designed for immersive role
 ### 📦 Download Latest Builds
 
 For the easiest experience, download the latest stable application for your platform from the **[Releases](https://github.com/KiwiSingh/JOSIE-Bot/releases)** section:
+- **Linux**: `JOSIE-Linux.tar.gz`
 - **macOS**: `JOSIE.dmg` (Optimized for Apple Silicon).
 - **Windows**: `JOSIE.exe.zip`.
 - **iOS**: `JOSIE.ipa`
@@ -36,8 +37,8 @@ For the easiest experience, download the latest stable application for your plat
 
 ## 📱 iOS Version
 
-- **Model Availability**: The iOS build currently ships with only two models (**JosieQwen** and **JosieNidum**). For the best experience, use **JosieQwen**.
-- **Model Download**: Download the models as a zip file [here](https://mega.nz/file/Ik0SFIpI#3_uxyZyzpcdoLw85T-lJWKwKuoiHu7NICFHUST10OG0), unzip it, and move the individual model folders into the `JOSIE/Models` folder in your Files app.
+- **Model Availability**: The iOS build currently ships with only three models (**JosieQwen**, **JosieGabby** and **JosieNidum**). For the best experience, use **JosieQwen** or **JosieGabby**.
+- **Model Download**: Download the models as a zip file [here](https://mega.nz/file/g0liAITa#VA0Tz8-2eNcVWi66Q-pgT8UKr9gVglY5k2fqKI-nLpI), unzip it, and move the individual model folders into the `JOSIE/Models` folder in your Files app.
 - **Download Issues**: If you hit rate limits or download errors, use **[MegaBasterd](https://github.com/tonikelope/megabasterd)**.
 - **Installation:** Sideload the IPA using Sideloadly, AltStore, or TrollStore.
 
@@ -51,9 +52,9 @@ For the easiest experience, download the latest stable application for your plat
 
 ---
 
-### 💻 Developer / Linux Setup
+### 💻 Developer  Setup
 
-If you are on Linux, or prefer running from source:
+If you are on a nonstandard Linux distro or prefer running from source:
 
 #### 1. Prerequisites
 - **Python 3.10+** (Recommend Python 3.12 for macOS users).
@@ -62,8 +63,8 @@ If you are on Linux, or prefer running from source:
 > [!TIP]
 > **No Ollama yet?** You can download Ollama and install all required models directly from within the JOSIE interface using the integrated setup buttons!
 
-#### 2. Linux / Manual Installation
-Linux users should run the application directly via Python. We recommend using a virtual environment:
+#### 2. Manual Installation
+Linux users on nonstandard distros should run the application directly via Python. We recommend using a virtual environment:
 
 ```bash
 # Clone the Repository
