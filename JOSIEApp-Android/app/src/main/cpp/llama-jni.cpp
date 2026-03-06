@@ -50,7 +50,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   LOGI("Loading model from %s", path);
 
   llama_backend_init();
-  llama_numa_init();
+  llama_numa_init(GGML_NUMA_STRATEGY_DISABLED);
 
   auto mparams = llama_model_default_params();
 
@@ -81,11 +81,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   cparams.n_ubatch = 512;
 
   // Vulkan + KV optimizations
-  cparams.flash_attn = true;
   cparams.offload_kqv = true;
-
-  // Dynamic GPU offload
-  cparams.n_gpu_layers = detect_gpu_layers();
 
   unsigned int cores = std::thread::hardware_concurrency();
 
@@ -94,7 +90,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   cparams.n_threads_batch = std::max(2u, cores - 1);
 
   LOGI("Context: ctx=%d gpu_layers=%d threads=%d/%d", cparams.n_ctx,
-       cparams.n_gpu_layers, cparams.n_threads, cparams.n_threads_batch);
+       mparams.n_gpu_layers, cparams.n_threads, cparams.n_threads_batch);
 
   ctx = llama_init_from_model(model, cparams);
 
@@ -214,7 +210,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   llama_sampler_chain_add(smpl, llama_sampler_init_temp(0.85f));
   llama_sampler_chain_add(smpl, llama_sampler_init_top_k(40));
-  llama_sampler_chain_add(smpl, llama_sampler_init_top_p(0.9f));
+  llama_sampler_chain_add(smpl, llama_sampler_init_top_p(0.9f, 1));
 
   llama_sampler_chain_add(smpl, llama_sampler_init_dist(time(NULL)));
 
