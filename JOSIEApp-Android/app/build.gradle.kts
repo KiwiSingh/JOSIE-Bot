@@ -27,6 +27,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "kiwi.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         debug {
             // Vulkan is disabled for AVD/emulator stability.
@@ -42,6 +51,8 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
+            
             // Vulkan enabled for GPU-accelerated inference on real devices.
             // ARM dot-product and FP16 intrinsics give a significant additional
             // speedup on Snapdragon 8xx, Dimensity 9xxx, and Exynos 2xxx SoCs.
@@ -49,15 +60,15 @@ android {
                 cmake {
                     // Note: -ffast-math is intentionally NOT used here.
                     // ggml's vec.h explicitly rejects -ffinite-math-only (implied by -ffast-math)
-                    // because it uses NaN/Inf checks internally. Use -fno-finite-math-only instead,
+                    // because it uses NaN/Inf checks internally.
+                    // Use -fno-finite-math-only instead,
                     // which still enables most fast-math optimizations safely.
                     cppFlags += "-std=c++17 -O3 -march=armv8-a+dotprod+fp16 -fno-finite-math-only"
                     arguments += "-DGGML_VULKAN=ON"
-                    // The Android SDK's isolated CMake environment cannot find glslc via PATH.
-                    // This explicitly points the Vulkan shader compiler at the Homebrew binary
-                    // so that .comp shaders are compiled to SPIR-V (.spv) at build time.
-                    // Without this, flash_attn and other Vulkan symbols are undefined at link time.
-                    arguments += "-DVulkan_GLSLC_EXECUTABLE=/opt/homebrew/bin/glslc"
+                    
+                    // Dynamically routes glslc for macOS (local) or Ubuntu (GitHub Actions)
+                    val glslcPath = System.getenv("GLSLC_PATH") ?: "/opt/homebrew/bin/glslc"
+                    arguments += "-DVulkan_GLSLC_EXECUTABLE=$glslcPath"
                 }
             }
         }
