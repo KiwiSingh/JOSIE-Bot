@@ -1,5 +1,7 @@
 package com.josie.ai
 
+import androidx.annotation.Keep // 1. Add this import
+
 class LlamaNative {
     companion object {
         init {
@@ -7,9 +9,9 @@ class LlamaNative {
         }
     }
 
+    @Keep // 2. Protect the interface from obfuscation
     interface StreamCallback {
-        // Receives raw bytes from llama_token_to_piece — may not be valid UTF-8.
-        // Decode with Charsets.UTF_8 + REPLACE to safely handle byte-fallback tokens.
+        @Keep // 3. Protect the exact method name and signature
         fun onToken(bytes: ByteArray)
     }
 
