@@ -1,0 +1,39 @@
+name: Build JOSIE Windows
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller requests Pillow --prefer-binary
+        pip install edge-tts SpeechRecognition PyAudio --prefer-binary
+
+    - name: Build and Zip JOSIE Executable
+      run: |
+        # Build with the injected version metadata
+        pyinstaller --noconsole --onefile --icon=josie.ico --add-data "josie_avatar.png;." --version-file=version.txt --clean josie.py
+        
+        # Zip the clean filename
+        Compress-Archive -Path dist\JOSIE.exe -DestinationPath dist\JOSIE.exe.zip
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: JOSIE-Windows
+        path: dist/JOSIE.exe.zip
