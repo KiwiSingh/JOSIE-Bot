@@ -57,11 +57,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release") [cite: 14]
+            signingConfig = signingConfigs.getByName("release")
 
             externalNativeBuild {
                 cmake {
-                    cppFlags += "-std=c++17 -O3 -march=armv8-a+dotprod+fp16 -fno-finite-math-only" [cite: 19]
+                    cppFlags += "-std=c++17 -O3 -march=armv8-a+dotprod+fp16 -fno-finite-math-only"
                     arguments += "-DGGML_VULKAN=ON"
                     arguments += "-DCMAKE_BUILD_TYPE=Release"
                     arguments += "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG"
@@ -79,7 +79,7 @@ android {
             }
             
             ndk {
-                debugSymbolLevel = "NONE" [cite: 22]
+                debugSymbolLevel = "NONE"
             }
 }
     }
