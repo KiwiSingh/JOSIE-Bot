@@ -7,8 +7,8 @@ android {
     namespace = "com.josie.ai"
     compileSdk = 34
     lint {
-        checkReleaseBuilds = false
-    }
+    checkReleaseBuilds = false
+}
 
     defaultConfig {
         applicationId = "com.josie.ai"
@@ -57,34 +57,31 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
-            
-            // Vulkan enabled for GPU-accelerated inference on real devices.
-            // ARM dot-product and FP16 intrinsics give a significant additional
-            // speedup on Snapdragon 8xx, Dimensity 9xxx, and Exynos 2xxx SoCs.
+            signingConfig = signingConfigs.getByName("release") [cite: 14]
+
             externalNativeBuild {
                 cmake {
-                    // Note: -ffast-math is intentionally NOT used here.
-                    // ggml's vec.h explicitly rejects -ffinite-math-only (implied by -ffast-math)
-                    // because it uses NaN/Inf checks internally.
-                    // Use -fno-finite-math-only instead,
-                    // which still enables most fast-math optimizations safely.
-                    cppFlags += "-std=c++17 -O3 -march=armv8-a+dotprod+fp16 -fno-finite-math-only"
+                    cppFlags += "-std=c++17 -O3 -march=armv8-a+dotprod+fp16 -fno-finite-math-only" [cite: 19]
                     arguments += "-DGGML_VULKAN=ON"
                     arguments += "-DCMAKE_BUILD_TYPE=Release"
                     arguments += "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG"
 
-                    // Dynamically routes glslc for macOS (local) or Ubuntu (GitHub Actions)
-                    val glslcPath = System.getenv("GLSLC_PATH") ?: "/opt/homebrew/bin/glslc"
+                    // --- THE FIX: Robust NDK Shader Compiler Pathing ---
+                    // This detects if we are on your Mac (darwin) or GitHub Actions (linux)
+                    // and uses the compiler bundled with the Android NDK.
+                    val ndkDir = android.ndkDirectory.absolutePath
+                    val osName = System.getProperty("os.name").lowercase()
+                    val hostTag = if (osName.contains("mac")) "darwin-x86_64" else "linux-x86_64"
+                    val glslcPath = "$ndkDir/shader-tools/$hostTag/glslc"
+                    
                     arguments += "-DVulkan_GLSLC_EXECUTABLE=$glslcPath"
                 }
             }
-            // Strip native debug symbols from the release APK.
-            // Without this the .so files retain full DWARF info — a major contributor to 4x size.
+            
             ndk {
-                debugSymbolLevel = "NONE"
+                debugSymbolLevel = "NONE" [cite: 22]
             }
-        }
+}
     }
 
     compileOptions {
