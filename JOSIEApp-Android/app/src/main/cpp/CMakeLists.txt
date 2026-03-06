@@ -99,9 +99,15 @@ set(GGML_VULKAN_SHADERS_GEN_CMAKE_CACHE_ARGS
 
 
 # ------------------------------------------------
+# Ensure Vulkan shader output directory exists
+# ------------------------------------------------
 
+file(MAKE_DIRECTORY
+    ${CMAKE_BINARY_DIR}/llama.cpp_build/ggml/src/ggml-vulkan/vulkan-shaders.spv
+)
+
+# ------------------------------------------------
 # Build llama.cpp
-
 # ------------------------------------------------
 
 add_subdirectory(${LLAMA_DIR} llama.cpp_build)
