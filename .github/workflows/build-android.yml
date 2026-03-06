@@ -24,7 +24,7 @@ jobs:
 
     - name: Install Vulkan Shader Compiler
       # Installs the required shader tools so Ubuntu can compile your .comp files
-      run: sudo apt-get update && sudo apt-get install -y glslang-tools glslc
+      run: sudo apt-get update && sudo apt-get install -y glslang-tools glslc libvulkan-dev
 
     - name: Decode Keystore
       env:
