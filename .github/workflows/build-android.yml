@@ -28,11 +28,17 @@ jobs:
 
     - name: Inject Vulkan C++ Headers into Android NDK
       run: |
-        # Download the official Vulkan C++ headers
+        # 1. Force the Android SDK Manager to download the NDK so the folder actually exists
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;25.1.8937393"
+        
+        # 2. Download the official Vulkan C++ headers
         git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
         
-        # Forcefully copy them into the NDK's isolated sysroot folder
-        sudo cp -a Vulkan-Headers/include/vulkan/* /usr/local/lib/android/sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/vulkan/
+        # 3. Create the missing Vulkan directory just to be safe
+        sudo mkdir -p $ANDROID_HOME/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/vulkan
+        
+        # 4. Forcefully copy the C++ headers into the NDK's isolated sysroot folder
+        sudo cp -a Vulkan-Headers/include/vulkan/* $ANDROID_HOME/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/vulkan/
 
     - name: Decode Keystore
       env:
