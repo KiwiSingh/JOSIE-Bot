@@ -11,85 +11,42 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-#include <sys/sysinfo.h>
-
-static int detect_gpu_layers() {
-  struct sysinfo info;
-  sysinfo(&info);
-
-  // Add 512MB to account for OS reserved memory before dividing
-  long ram_gb =
-      (info.totalram + (1024LL * 1024LL * 512LL)) / (1024LL * 1024LL * 1024LL);
-
-  if (ram_gb >= 11)
-    return 999; // Full offload for 12GB+ devices
-  if (ram_gb >= 8)
-    return 40;
-  if (ram_gb >= 6)
-    return 28;
-
-  return 16;
-}
-
 static llama_model *model = nullptr;
 static llama_context *ctx = nullptr;
 static std::vector<llama_token> last_tokens; // For prefix caching
-static bool is_backend_initialized = false;
 
 extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
     JNIEnv *env, jobject thiz, jstring model_path) {
-
   const char *path = env->GetStringUTFChars(model_path, nullptr);
   LOGI("Loading model from %s", path);
 
-  if (!is_backend_initialized) {
-    llama_backend_init();
-    is_backend_initialized = true;
-  }
-  LOGI("Step 1: backend init done, loading model file...");
+  llama_backend_init();
 
-  // --- 1. SET GPU LAYERS HERE ---
   auto mparams = llama_model_default_params();
-  mparams.n_gpu_layers = detect_gpu_layers();
-
   model = llama_model_load_from_file(path, mparams);
 
   if (!model) {
-    LOGE("Step 2: Failed to load model from %s", path);
+    LOGE("Failed to load model from %s", path);
     env->ReleaseStringUTFChars(model_path, path);
     return JNI_FALSE;
   }
 
-  LOGI("Step 2: model pointer = %p, allocating context...", model);
-
-  // --- 2. RESTORE FLASH ATTN TO SAVE RAM ---
   auto cparams = llama_context_default_params();
-  cparams.n_ctx = 1024;
-  cparams.n_batch = 512;
-  cparams.n_ubatch = 512;
+  cparams.n_ctx = 2048;
+  cparams.n_batch = 1024;
+  cparams.n_ubatch = 512; // Standard physical batch limit
 
   unsigned int cores = std::thread::hardware_concurrency();
-  cparams.n_threads = std::max(2u, cores - 2);
-  cparams.n_threads_batch = std::max(2u, cores);
-
-  LOGI("Context parameters: threads=%d/%d, ctx=%d, batch=%d, ubatch=%d, "
-       "gpu_layers=%d",
+  cparams.n_threads = std::max(1u, cores / 2);
+  cparams.n_threads_batch = std::max(1u, cores);
+  LOGI("Context parameters: threads=%d/%d, ctx=%d, ubatch=%d",
        cparams.n_threads, cparams.n_threads_batch, cparams.n_ctx,
-       cparams.n_batch, cparams.n_ubatch, mparams.n_gpu_layers);
+       cparams.n_ubatch);
 
   ctx = llama_init_from_model(model, cparams);
 
   env->ReleaseStringUTFChars(model_path, path);
-
-  if (!ctx) {
-    LOGE("Step 3: llama_init_from_model failed — freeing model to avoid leak");
-    llama_model_free(model);
-    model = nullptr;
-    return JNI_FALSE;
-  }
-
-  LOGI("Step 3: ctx pointer = %p — load complete", ctx);
-  return JNI_TRUE;
+  return ctx != nullptr ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
@@ -102,10 +59,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   const char *p_str = env->GetStringUTFChars(prompt, nullptr);
   int p_bytes = strlen(p_str);
 
-  // Use a generous fixed buffer — p_bytes alone is not a safe upper bound
-  // because llama_tokenize adds special tokens and p_bytes is UTF-8 bytes, not
-  // chars.
-  const int n_tokens_max = p_bytes / 2 + 64;
+  // Tokenization
+  const int n_tokens_max = p_bytes + 4;
   std::vector<llama_token> tokens(n_tokens_max);
   int n_tokens = llama_tokenize(llama_model_get_vocab(model), p_str, p_bytes,
                                 tokens.data(), tokens.size(), true, true);
@@ -140,13 +95,13 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   int n_past = n_keep;
   int n_decode = tokens.size() - n_past;
 
-  // CRITICAL: If everything is cached, we still need logits for the last token
-  // to sample. We re-decode just the last token if n_decode is 0.
+  // CRITICAL: If everything is cached, we still need logits for the last token to sample.
+  // We re-decode just the last token if n_decode is 0.
   if (n_decode == 0 && !tokens.empty()) {
-    n_past -= 1;
-    n_decode = 1;
-    // Must remove the overlapping KV cache entry before we can re-evaluate it
-    llama_memory_seq_rm(llama_get_memory(ctx), -1, n_past, -1);
+      n_past -= 1;
+      n_decode = 1;
+      // Must remove the overlapping KV cache entry before we can re-evaluate it
+      llama_memory_seq_rm(llama_get_memory(ctx), -1, n_past, -1);
   }
 
   LOGI("Context Info: n_tokens=%zu, n_keep=%d, n_past=%d, n_decode=%d",
@@ -185,6 +140,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   last_tokens = tokens;
 
+  // Sampling setup
   // Sampling setup: Optimized for Roleplay (Creative but coherent)
   auto smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
   // 1. Penalties first
@@ -196,12 +152,9 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   llama_sampler_chain_add(smpl, llama_sampler_init_temp(0.80f));
   // 4. Sample (Distribution)
   llama_sampler_chain_add(smpl, llama_sampler_init_dist(time(NULL)));
-
   jclass callbackClass = env->GetObjectClass(callback);
-
-  // Signature updated: onToken now receives a byte[] to safely handle non-UTF-8
-  // token pieces
-  jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)V");
+  jmethodID onTokenMethod =
+      env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)V");
 
   int n_cur = tokens.size();
   int n_gen = 0;
@@ -210,11 +163,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   auto t_start = std::chrono::high_resolution_clock::now();
 
-  // CRITICAL PERF FIX: Initialize the batch ONCE before the loop
-  llama_batch gen_batch = llama_batch_init(1, 0, 1);
-
   while (n_cur < llama_n_ctx(ctx) && n_gen < 1024) {
-    // Sample the next token.
+    // Sample the next token. 
     int sampling_idx = (n_gen == 0) ? last_eval_idx : 0;
     llama_token id = llama_sampler_sample(smpl, ctx, sampling_idx);
     llama_sampler_accept(smpl, id);
@@ -231,21 +181,17 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
     int n_chars = llama_token_to_piece(llama_model_get_vocab(model), id, piece,
                                        sizeof(piece), 0, false);
     if (n_chars > 0) {
-      jbyteArray jbytes = env->NewByteArray(n_chars);
-      env->SetByteArrayRegion(jbytes, 0, n_chars,
-                              reinterpret_cast<const jbyte *>(piece));
-
-      // CRITICAL JNI FIX: Use CallVoidMethod because onToken returns void
-      env->CallVoidMethod(callback, onTokenMethod, jbytes);
-
-      env->DeleteLocalRef(jbytes);
+      std::string s(piece, n_chars);
+      jstring jword = env->NewStringUTF(s.c_str());
+      env->CallVoidMethod(callback, onTokenMethod, jword);
+      env->DeleteLocalRef(jword);
     }
 
     // Keep cache synchronized with generated output
     last_tokens.push_back(id);
 
-    // Reuse the same batch instead of allocating a new one
-    gen_batch.n_tokens = 1;
+    llama_batch gen_batch = llama_batch_init(1, 0, 1);
+    gen_batch.n_tokens = 1; // CRITICAL FIX
     gen_batch.token[0] = id;
     gen_batch.pos[0] = n_cur;
     gen_batch.n_seq_id[0] = 1;
@@ -254,15 +200,13 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
     if (llama_decode(ctx, gen_batch) != 0) {
       LOGE("Token decode failed at %d", n_cur);
+      llama_batch_free(gen_batch);
       break;
     }
-
+    llama_batch_free(gen_batch);
     n_cur++;
     n_gen++;
   }
-
-  // Free the batch ONCE after the loop completes
-  llama_batch_free(gen_batch);
 
   auto t_end = std::chrono::high_resolution_clock::now();
   auto ms =

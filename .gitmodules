@@ -1,0 +1,3 @@
+[submodule "JOSIEApp-Android/app/src/main/cpp/llama.cpp"]
+	path = JOSIEApp-Android/app/src/main/cpp/llama.cpp
+	url = https://github.com/ggerganov/llama.cpp.git
