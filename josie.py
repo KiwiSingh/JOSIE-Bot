@@ -48,6 +48,7 @@ except ImportError:
 
 # --- Configuration ---
 OLLAMA_HOST = "http://localhost:11434"
+MEMORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "josie_memory.json")
 
 MODELS = {
     "Stheno 8B (v3.1)": {
@@ -117,14 +118,46 @@ class OllamaWrapper:
         self.host = host.rstrip("/") + "/api/generate"
         self.model_key = list(MODELS.keys())[0]
         self.context = None
+        self._load_memory()
+
+    def _load_memory(self):
+        """Load persisted memory from disk on startup."""
+        try:
+            if os.path.exists(MEMORY_FILE):
+                with open(MEMORY_FILE, "r") as f:
+                    data = json.load(f)
+                saved_model = data.get("model_key")
+                if saved_model and saved_model in MODELS:
+                    self.model_key = saved_model
+                self.context = data.get("context")
+        except Exception:
+            self.context = None
+
+    def _save_memory(self):
+        """Persist current context to disk."""
+        try:
+            with open(MEMORY_FILE, "w") as f:
+                json.dump({"model_key": self.model_key, "context": self.context}, f)
+        except Exception:
+            pass
+
+    def _delete_memory(self):
+        """Wipe the memory file from disk."""
+        try:
+            if os.path.exists(MEMORY_FILE):
+                os.remove(MEMORY_FILE)
+        except Exception:
+            pass
 
     def set_model(self, model_key):
         if model_key in MODELS:
             self.model_key = model_key
             self.context = None
+            self._delete_memory()
 
     def clear_memory(self):
         self.context = None
+        self._delete_memory()
 
     def generate(self, prompt: str) -> str:
         config = MODELS[self.model_key]
@@ -144,6 +177,7 @@ class OllamaWrapper:
             if response.status_code == 200:
                 data = response.json()
                 self.context = data.get("context")
+                self._save_memory()
                 return data["response"]
             return f"Error: Status {response.status_code}"
         except:
@@ -249,6 +283,14 @@ class JOSIEChatGUI:
         self.root.after(100, self.poll_stt_queue)
         if MACOS_SPEECH_ENABLED:
             self.recognizer = SFSpeechRecognizer.alloc().initWithLocale_(NSLocale.alloc().initWithLocaleIdentifier_("en-US"))
+
+        # Sync UI to restored memory state
+        restored_model = josie_client.model_key
+        self.model_var.set(restored_model)
+        self.model_desc.config(text=MODELS[restored_model]["description"])
+        if josie_client.context:
+            self.status.config(text="●  MEMORY RESTORED", fg=ACCENT_COLOR)
+            self.root.after(2500, lambda: self.status.config(text="●  READY  ", fg=STATUS_COLOR))
 
     def poll_stt_queue(self):
         while not self.stt_queue.empty():
@@ -399,7 +441,7 @@ class JOSIEChatGUI:
 
     def reset_brain(self):
         josie_client.clear_memory()
-        messagebox.showinfo("Brain", "JOSIE reset!")
+        messagebox.showinfo("Brain", "JOSIE's memory wiped! She starts fresh next message.")
 
 if __name__ == "__main__":
     app_root = tk.Tk()
