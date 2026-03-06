@@ -22,28 +22,24 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Install Vulkan Shader Compiler
+    - name: Install NDK, Vulkan Headers, and glslc
       run: |
         sudo apt-get update && sudo apt-get install -y libvulkan-dev
-        # Download prebuilt glslc from Google's shaderc releases — works on any Ubuntu version
-        curl -L https://storage.googleapis.com/shaderc/artifacts/prod/graphics_shader_compiler/shaderc/linux/continuous_clang_release/latest/install.tgz \
-          | sudo tar -xz -C /usr/local
-        export PATH="/usr/local/install/bin:$PATH"
-        which glslc && glslc --version
 
-    - name: Inject Vulkan C++ Headers into Android NDK
-      run: |
-        # 1. Force the Android SDK Manager to download the NDK so the folder actually exists
+        # Install NDK
         echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;25.1.8937393"
 
-        # 2. Download the official Vulkan C++ headers
+        # Inject Vulkan C++ headers into the NDK sysroot
         git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
-
-        # 3. Create the base include directory just to be safe
         sudo mkdir -p $ANDROID_HOME/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-
-        # 4. Forcefully copy BOTH vulkan/ and vk_video/ into the NDK's isolated sysroot
         sudo cp -a Vulkan-Headers/include/* $ANDROID_HOME/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/
+
+        # Use glslc bundled with the NDK — no external downloads needed
+        NDK_GLSLC="$ANDROID_HOME/ndk/25.1.8937393/shader-tools/linux-x86_64/glslc"
+        echo "GLSLC_PATH=$NDK_GLSLC" >> $GITHUB_ENV
+
+        # Hard-fail if glslc is missing so we don't get a silent bad build
+        $NDK_GLSLC --version
 
     - name: Decode Keystore
       env:
@@ -58,7 +54,7 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        GLSLC_PATH: "/usr/local/install/bin/glslc"
+        # GLSLC_PATH is set dynamically in the previous step via $GITHUB_ENV
       run: |
         cd JOSIEApp-Android
         chmod +x gradlew
