@@ -17,18 +17,18 @@ static int detect_gpu_layers() {
   struct sysinfo info;
   sysinfo(&info);
 
-  long ram_gb = info.totalram / (1024LL * 1024LL * 1024LL);
+  // Add 512MB to account for OS reserved memory before dividing
+  long ram_gb =
+      (info.totalram + (1024LL * 1024LL * 512LL)) / (1024LL * 1024LL * 1024LL);
 
-  if (ram_gb >= 12)
-    return 999; // Offload everything
+  if (ram_gb >= 11)
+    return 999; // Full offload for 12GB+ devices
   if (ram_gb >= 8)
     return 40;
   if (ram_gb >= 6)
     return 28;
-  if (ram_gb >= 4)
-    return 16;
 
-  return 8;
+  return 16;
 }
 
 static llama_model *model = nullptr;
@@ -66,13 +66,13 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   auto cparams = llama_context_default_params();
   cparams.n_ctx = 1024;
   cparams.n_batch = 512;
-  cparams.n_ubatch = 256;
+  cparams.n_ubatch = 512;
   cparams.flash_attn = true; // Crucial for reducing KV cache memory footprint
   cparams.offload_kqv = true;
 
   unsigned int cores = std::thread::hardware_concurrency();
-  cparams.n_threads = std::max(1u, cores / 2);
-  cparams.n_threads_batch = std::max(1u, cores);
+  cparams.n_threads = std::max(2u, cores - 2);
+  cparams.n_threads_batch = std::max(2u, cores);
 
   LOGI("Context parameters: threads=%d/%d, ctx=%d, batch=%d, ubatch=%d, "
        "gpu_layers=%d",
