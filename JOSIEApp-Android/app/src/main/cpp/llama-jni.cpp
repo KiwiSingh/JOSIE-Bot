@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <android/log.h>
 #include <chrono>
+#include <cstring>
+#include <ctime>
 #include <jni.h>
 #include <string>
 #include <sys/sysinfo.h>
@@ -10,8 +12,8 @@
 #include <vector>
 
 #define LOG_TAG "JOSIE_LLAMA"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, **VA_ARGS **)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, **VA_ARGS **)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 static llama_model *model = nullptr;
 static llama_context *ctx = nullptr;
@@ -23,7 +25,8 @@ static int detect_gpu_layers() {
   struct sysinfo info;
   sysinfo(&info);
 
-  ``` long ram_gb = info.totalram / (1024LL * 1024LL * 1024LL);
+  long long total_ram = (long long)info.totalram * info.mem_unit;
+  long ram_gb = total_ram / (1024LL * 1024LL * 1024LL);
 
   if (ram_gb >= 12)
     return 999;
@@ -35,7 +38,6 @@ static int detect_gpu_layers() {
     return 16;
 
   return 8;
-  ```
 }
 
 // ---------------- LOAD MODEL ----------------
@@ -43,7 +45,7 @@ static int detect_gpu_layers() {
 extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
     JNIEnv *env, jobject thiz, jstring model_path) {
 
-  ``` const char *path = env->GetStringUTFChars(model_path, nullptr);
+  const char *path = env->GetStringUTFChars(model_path, nullptr);
 
   LOGI("Loading model from %s", path);
 
@@ -58,7 +60,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   // 2. DISABLE MLOCK (Allows the OS to reclaim memory if needed)
   mparams.use_mlock = false;
 
-  // 3. SET GPU LAYERS (Keep this logic we wrote earlier)
+  // 3. SET GPU LAYERS
   mparams.n_gpu_layers = detect_gpu_layers();
 
   model = llama_model_load_from_file(path, mparams);
@@ -99,7 +101,6 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   env->ReleaseStringUTFChars(model_path, path);
 
   return ctx != nullptr ? JNI_TRUE : JNI_FALSE;
-  ```
 }
 
 // ---------------- GENERATION ----------------
@@ -107,7 +108,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
 extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
     JNIEnv *env, jobject thiz, jstring prompt, jobject callback) {
 
-  ``` if (!ctx || !model) {
+  if (!ctx || !model) {
     LOGE("Model not initialized");
     return;
   }
@@ -141,7 +142,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   int n_keep = 0;
 
-  for (int i = 0; i < std::min(tokens.size(), last_tokens.size()); i++) {
+  for (size_t i = 0; i < std::min(tokens.size(), last_tokens.size()); i++) {
     if (tokens[i] != last_tokens[i])
       break;
     n_keep++;
@@ -291,7 +292,6 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
        (n_gen * 1000.0 / (ms + 1)));
 
   llama_sampler_free(smpl);
-  ```
 }
 
 // ---------------- UNLOAD ----------------
@@ -299,7 +299,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 extern "C" JNIEXPORT void JNICALL
 Java_com_josie_ai_LlamaNative_unload(JNIEnv *env, jobject thiz) {
 
-  ``` if (ctx) llama_free(ctx);
+  if (ctx)
+    llama_free(ctx);
   if (model)
     llama_model_free(model);
 
@@ -307,5 +308,4 @@ Java_com_josie_ai_LlamaNative_unload(JNIEnv *env, jobject thiz) {
   model = nullptr;
 
   last_tokens.clear();
-  ```
 }
