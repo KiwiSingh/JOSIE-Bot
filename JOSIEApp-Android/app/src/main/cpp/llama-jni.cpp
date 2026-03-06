@@ -29,15 +29,15 @@ static int detect_gpu_layers() {
   long ram_gb = total_ram / (1024LL * 1024LL * 1024LL);
 
   if (ram_gb >= 12)
-    return 33;
+    return 999;
   if (ram_gb >= 8)
-    return 28;
+    return 40;
   if (ram_gb >= 6)
-    return 20;
+    return 28;
   if (ram_gb >= 4)
-    return 12;
+    return 16;
 
-  return 6;
+  return 8;
 }
 
 // ---------------- LOAD MODEL ----------------
@@ -74,11 +74,11 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   auto cparams = llama_context_default_params();
 
   // Larger context window
-  cparams.n_ctx = 2048;
+  cparams.n_ctx = 4096;
 
   // Batching optimized for mobile GPUs
-  cparams.n_batch = 512;
-  cparams.n_ubatch = 256;
+  cparams.n_batch = 1024;
+  cparams.n_ubatch = 512;
 
   // Vulkan + KV optimizations
   cparams.offload_kqv = true;
@@ -227,7 +227,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   while (n_cur < llama_n_ctx(ctx) && n_gen < max_gen) {
 
-    int sampling_idx = (n_gen == 0) ? last_eval_idx : 0;
+    int sampling_idx = -1;
 
     llama_token id = llama_sampler_sample(smpl, ctx, sampling_idx);
 
