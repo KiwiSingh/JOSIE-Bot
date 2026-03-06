@@ -23,24 +23,25 @@ jobs:
         cache: gradle
 
     - name: Install Vulkan Shader Compiler
-      # glslang-tools on Ubuntu 24.04 (noble) ships glslc at /usr/bin/glslc as of v15.1.0.
-      # The phantom apt package 'glslc' is dropped; glslang-tools is sufficient.
-      # The LunarG SDK approach fails on noble due to broken jammy deps.
       run: |
-        sudo apt-get update && sudo apt-get install -y glslang-tools libvulkan-dev
+        sudo apt-get update && sudo apt-get install -y libvulkan-dev
+        # Download prebuilt glslc from Google's shaderc releases — works on any Ubuntu version
+        curl -L https://storage.googleapis.com/shaderc/artifacts/prod/graphics_shader_compiler/shaderc/linux/continuous_clang_release/latest/install.tgz \
+          | sudo tar -xz -C /usr/local
+        export PATH="/usr/local/install/bin:$PATH"
         which glslc && glslc --version
 
     - name: Inject Vulkan C++ Headers into Android NDK
       run: |
         # 1. Force the Android SDK Manager to download the NDK so the folder actually exists
         echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;25.1.8937393"
-        
+
         # 2. Download the official Vulkan C++ headers
         git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
-            
+
         # 3. Create the base include directory just to be safe
         sudo mkdir -p $ANDROID_HOME/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-            
+
         # 4. Forcefully copy BOTH vulkan/ and vk_video/ into the NDK's isolated sysroot
         sudo cp -a Vulkan-Headers/include/* $ANDROID_HOME/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/
 
@@ -57,7 +58,7 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        GLSLC_PATH: "/usr/bin/glslc"
+        GLSLC_PATH: "/usr/local/install/bin/glslc"
       run: |
         cd JOSIEApp-Android
         chmod +x gradlew
