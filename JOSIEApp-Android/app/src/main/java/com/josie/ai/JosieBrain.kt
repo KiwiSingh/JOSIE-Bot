@@ -10,8 +10,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.Channel
 import android.util.Log
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 
-class JosieBrain : ViewModel() {
+class JosieBrain(application: Application) : AndroidViewModel(application) {
     private val _status = MutableStateFlow(ModelStatus.IDLE)
     val status = _status.asStateFlow()
     private val TAG = "JOSIE_BRAIN"
@@ -84,6 +89,68 @@ class JosieBrain : ViewModel() {
         I'm still here, and I'm not going anywhere. But please talk to one of them first. 💙
     """.trimIndent()
 
+    // ── Conversation History ─────────────────────────────────────────────────
+
+    private val maxHistoryTurns = 20
+    private val maxHistoryChars = 12_000
+
+    private val historyFile: File
+        get() = File(getApplication<Application>().filesDir, "josie_history.json")
+
+    private val conversationHistory = mutableListOf<Pair<String, String>>()
+
+    private fun loadHistory() {
+        if (!historyFile.exists()) return
+        try {
+            val arr = JSONArray(historyFile.readText())
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                conversationHistory.add(Pair(obj.getString("role"), obj.getString("content")))
+            }
+            Log.d(TAG, "Loaded ${conversationHistory.size} history turns from disk")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load history", e)
+        }
+    }
+
+    private fun saveHistory() {
+        try {
+            val arr = JSONArray()
+            for ((role, content) in conversationHistory) {
+                arr.put(JSONObject().put("role", role).put("content", content))
+            }
+            historyFile.writeText(arr.toString())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save history", e)
+        }
+    }
+
+    fun clearHistory() {
+        conversationHistory.clear()
+        historyFile.delete()
+    }
+
+    private fun appendTurn(role: String, content: String) {
+        conversationHistory.add(Pair(role, content))
+        while (conversationHistory.size > maxHistoryTurns) conversationHistory.removeAt(0)
+        while (conversationHistory.sumOf { it.second.length } > maxHistoryChars
+               && conversationHistory.size > 2) conversationHistory.removeAt(0)
+        saveHistory()
+    }
+
+    private fun buildPrompt(userText: String): String {
+        val sb = StringBuilder(personaPrompt)
+        for ((role, content) in conversationHistory) {
+            if (role == "user") {
+                sb.append("\n<start_of_turn>user\n$content<end_of_turn>")
+            } else {
+                sb.append("\n<start_of_turn>model\n$content<end_of_turn>")
+            }
+        }
+        sb.append("\n<start_of_turn>user\n$userText<end_of_turn>\n<start_of_turn>model\n")
+        return sb.toString()
+    }
+
     fun loadModel(modelPath: String, name: String) {
         viewModelScope.launch {
             _status.value = ModelStatus.LOADING
@@ -98,6 +165,7 @@ class JosieBrain : ViewModel() {
                 Log.d(TAG, "Model loaded successfully")
                 _status.value = ModelStatus.READY
                 _currentModelName.value = name
+                loadHistory()
             } else {
                 Log.e(TAG, "Failed to load model")
                 _status.value = ModelStatus.ERROR
@@ -135,7 +203,7 @@ class JosieBrain : ViewModel() {
             val generationJob = launch(Dispatchers.IO) {
                 Log.d(TAG, "Starting JNI generation stream...")
                 try {
-                    val prompt = personaPrompt + "\n<start_of_turn>user\n$text<end_of_turn>\n<start_of_turn>model\n"
+                    val prompt = buildPrompt(text)
                     llamaNative.generateStream(prompt, object : LlamaNative.StreamCallback {
                         override fun onToken(token: String) {
                             Log.v(TAG, "Token received: [${token.replace("\n", "\\n")}]")
@@ -181,7 +249,10 @@ class JosieBrain : ViewModel() {
             }
             
             // Final UI update to ensure everything is shown
-            messages[messageIndex] = messages[messageIndex].copy(text = responseBuffer.toString())
+            val finalResponse = responseBuffer.toString()
+            messages[messageIndex] = messages[messageIndex].copy(text = finalResponse)
+            appendTurn("user", text)
+            appendTurn("model", finalResponse)
             _status.value = ModelStatus.READY
             
             // Final bit of speech if any

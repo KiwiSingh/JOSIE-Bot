@@ -1,6 +1,14 @@
 import Foundation
 import Combine
 import MachO
+
+// MARK: - Persistent Conversation History
+
+/// A single turn in the conversation, Codable for JSON persistence.
+struct ConversationTurn: Codable {
+    let role: String   // "user" or "assistant"
+    let content: String
+}
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -120,12 +128,53 @@ final class JosieBrain: ObservableObject {
     private var pendingModelName: String?
     private var cancellables = Set<AnyCancellable>()
     
+    // MARK: - Conversation History
+    
+    private let maxHistoryTurns = 20
+    private let maxHistoryChars = 12_000
+    
+    private(set) var conversationHistory: [ConversationTurn] = []
+    
+    private var historyFileURL: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            .first?.appendingPathComponent("josie_history.json")
+    }
+    
+    private func loadHistory() {
+        guard let url = historyFileURL,
+              let data = try? Data(contentsOf: url),
+              let decoded = try? JSONDecoder().decode([ConversationTurn].self, from: data)
+        else { return }
+        conversationHistory = decoded
+    }
+    
+    private func saveHistory() {
+        guard let url = historyFileURL,
+              let data = try? JSONEncoder().encode(conversationHistory)
+        else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+    
+    func clearHistory() {
+        conversationHistory = []
+        if let url = historyFileURL { try? FileManager.default.removeItem(at: url) }
+    }
+    
+    private func appendTurn(role: String, content: String) {
+        conversationHistory.append(ConversationTurn(role: role, content: content))
+        while conversationHistory.count > maxHistoryTurns { conversationHistory.removeFirst() }
+        while conversationHistory.map({ $0.content }).joined().count > maxHistoryChars,
+              conversationHistory.count > 2 { conversationHistory.removeFirst() }
+        saveHistory()
+    }
+    
     // MARK: - Init
     
     init() {
         maxMemoryMB = recommendedMemoryCapMB()
         startMemoryMonitor()
         startMemoryWarningMonitor()
+        loadHistory()
     }
     
     private func modelsDirectoryURL() -> URL? {
@@ -298,6 +347,7 @@ final class JosieBrain: ObservableObject {
         modelContainer = nil
         pendingModelURL = nil
         pendingModelName = nil
+        clearHistory()
         defer { isLoading = false }
         
         guard let modelsURL = modelsDirectoryURL() else {
@@ -382,12 +432,14 @@ final class JosieBrain: ObservableObject {
                 repetitionContextSize: 256
             )
             
-            let messages: [Chat.Message] = [
-                .system(personaPrompt),
-                .user(prompt)
-            ]
+            var chatMessages: [Chat.Message] = [.system(personaPrompt)]
+            for turn in conversationHistory {
+                chatMessages.append(turn.role == "user" ? .user(turn.content) : .assistant(turn.content))
+            }
+            chatMessages.append(.user(prompt))
+            
             let userInput = UserInput(
-                prompt: .chat(messages)
+                prompt: .chat(chatMessages)
             )
             let input = try await modelContainer.prepare(
                 input: userInput
@@ -404,7 +456,10 @@ final class JosieBrain: ObservableObject {
                 }
             }
             
-            return output.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            appendTurn(role: "user", content: prompt)
+            appendTurn(role: "assistant", content: trimmed)
+            return trimmed
             
         } catch {
             print("❌ Generation failed:", error)
