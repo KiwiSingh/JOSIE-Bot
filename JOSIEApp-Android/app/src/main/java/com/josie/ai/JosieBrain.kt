@@ -241,8 +241,8 @@ You deserve help and support.
 
             val guard = guardrailResponse()
 
-            messages.add(ChatMessage(text, true))
-            messages.add(ChatMessage(guard, false))
+            messages.add(ChatMessage(text = text, isUser = true))
+            messages.add(ChatMessage(text = guard, isUser = false))
 
             return
         }
