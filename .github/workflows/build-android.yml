@@ -26,6 +26,14 @@ jobs:
       # Installs the required shader tools so Ubuntu can compile your .comp files
       run: sudo apt-get update && sudo apt-get install -y glslang-tools glslc libvulkan-dev
 
+    - name: Inject Vulkan C++ Headers into Android NDK
+      run: |
+        # Download the official Vulkan C++ headers
+        git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
+        
+        # Forcefully copy them into the NDK's isolated sysroot folder
+        sudo cp -a Vulkan-Headers/include/vulkan/* /usr/local/lib/android/sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/vulkan/
+
     - name: Decode Keystore
       env:
         ENCODED_STRING: ${{ secrets.KEYSTORE_BASE64 }}
