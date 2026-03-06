@@ -84,7 +84,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   // Clear mismatched tokens from KV cache
   if (n_keep < last_tokens.size()) {
-    llama_kv_cache_seq_rm(ctx, 0, n_keep, -1);
+    llama_kv_cache_tokens_rm(ctx, n_keep, -1);
   }
 
   int n_past = n_keep;
@@ -94,7 +94,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   if (n_decode == 0 && !tokens.empty()) {
     n_past -= 1;
     n_decode = 1;
-    llama_kv_cache_seq_rm(ctx, 0, n_past, -1);
+    llama_kv_cache_tokens_rm(ctx, n_past, -1);
   }
 
   LOGI("Cache hit: kept %d tokens, decoding %d new tokens.", n_keep, n_decode);
