@@ -216,8 +216,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
   jclass callbackClass = env->GetObjectClass(callback);
 
-  jmethodID onTokenMethod =
-      env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)V");
+  jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)V");
 
   int n_cur = tokens.size();
   int n_gen = 0;
@@ -246,13 +245,13 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
 
     if (n_chars > 0) {
 
-      std::string s(piece, n_chars);
+      jbyteArray jbytes = env->NewByteArray(n_chars);
+      env->SetByteArrayRegion(jbytes, 0, n_chars,
+                              reinterpret_cast<const jbyte *>(piece));
 
-      jstring jword = env->NewStringUTF(s.c_str());
+      env->CallVoidMethod(callback, onTokenMethod, jbytes);
 
-      env->CallVoidMethod(callback, onTokenMethod, jword);
-
-      env->DeleteLocalRef(jword);
+      env->DeleteLocalRef(jbytes);
     }
 
     last_tokens.push_back(id);
