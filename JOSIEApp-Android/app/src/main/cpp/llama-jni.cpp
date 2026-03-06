@@ -14,13 +14,17 @@
 static llama_model *model = nullptr;
 static llama_context *ctx = nullptr;
 static std::vector<llama_token> last_tokens; // For prefix caching
+static bool is_backend_initialized = false;
 
 extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
     JNIEnv *env, jobject thiz, jstring model_path) {
   const char *path = env->GetStringUTFChars(model_path, nullptr);
   LOGI("Loading model from %s", path);
 
-  llama_backend_init();
+  if (!is_backend_initialized) {
+    llama_backend_init();
+    is_backend_initialized = true;
+  }
 
   auto mparams = llama_model_default_params();
   model = llama_model_load_from_file(path, mparams);
