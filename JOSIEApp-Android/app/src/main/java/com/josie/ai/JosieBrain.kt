@@ -159,6 +159,7 @@ class JosieBrain(application: Application) : AndroidViewModel(application) {
             Log.d(TAG, "Loading model: $modelPath")
             
             val success = withContext(Dispatchers.IO) {
+                llamaNative.unload()
                 llamaNative.loadModel(modelPath)
             }
             
@@ -266,5 +267,10 @@ class JosieBrain(application: Application) : AndroidViewModel(application) {
             
             generationJob.join()
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        llamaNative.unload()
     }
 }

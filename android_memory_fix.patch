@@ -1,0 +1,32 @@
+diff --git a/JOSIEApp-Android/app/src/main/java/com/josie/ai/LlamaNative.kt b/JOSIEApp-Android/app/src/main/java/com/josie/ai/LlamaNative.kt
+--- a/JOSIEApp-Android/app/src/main/java/com/josie/ai/LlamaNative.kt
++++ b/JOSIEApp-Android/app/src/main/java/com/josie/ai/LlamaNative.kt
+@@ -13,4 +13,5 @@
+ 
+     external fun loadModel(modelPath: String): Boolean
+     external fun generateStream(prompt: String, callback: StreamCallback)
++    external fun unload()
+ }
+diff --git a/JOSIEApp-Android/app/src/main/java/com/josie/ai/JosieBrain.kt b/JOSIEApp-Android/app/src/main/java/com/josie/ai/JosieBrain.kt
+--- a/JOSIEApp-Android/app/src/main/java/com/josie/ai/JosieBrain.kt
++++ b/JOSIEApp-Android/app/src/main/java/com/josie/ai/JosieBrain.kt
+@@ -118,6 +118,7 @@
+             Log.d(TAG, "Loading model: $modelPath")
+             
+             val success = withContext(Dispatchers.IO) {
++                llamaNative.unload()
+                 llamaNative.loadModel(modelPath)
+             }
+             
+@@ -207,5 +208,10 @@
+             
+             generationJob.join()
+         }
+     }
++
++    override fun onCleared() {
++        super.onCleared()
++        llamaNative.unload()
++    }
+ }
+
