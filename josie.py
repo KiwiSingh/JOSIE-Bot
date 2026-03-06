@@ -408,9 +408,9 @@ class JOSIEChatGUI:
 
     def install_models(self):
         commands = [f"ollama pull {c['tag']}" for c in MODELS.values()]
-        full_command = " & ".join(commands) if sys.platform == "win32" else " && ".join(commands)
+        full_command = " && ".join(commands)
         if sys.platform == "win32":
-            subprocess.Popen(["cmd.exe", "/c", f"start cmd.exe /k \"{full_command} & echo ✅ DONE & pause\""])
+            subprocess.Popen(f'start cmd.exe /k "{full_command} && echo ✅ DONE && pause"', shell=True)
         else:
             subprocess.run(["osascript", "-e", f'tell application "Terminal" to do script "{full_command}"'])
 
