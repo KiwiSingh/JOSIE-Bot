@@ -347,7 +347,7 @@ final class JosieBrain: ObservableObject {
         modelContainer = nil
         pendingModelURL = nil
         pendingModelName = nil
-        clearHistory()
+        loadHistory()
         defer { isLoading = false }
         
         guard let modelsURL = modelsDirectoryURL() else {

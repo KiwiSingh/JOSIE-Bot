@@ -100,6 +100,7 @@ class JosieBrain(application: Application) : AndroidViewModel(application) {
     private val conversationHistory = mutableListOf<Pair<String, String>>()
 
     private fun loadHistory() {
+        conversationHistory.clear()
         if (!historyFile.exists()) return
         try {
             val arr = JSONArray(historyFile.readText())
