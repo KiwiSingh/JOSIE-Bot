@@ -51,6 +51,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
 
 extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
     JNIEnv *env, jobject thiz, jstring prompt, jobject callback) {
+
   if (!ctx || !model) {
     LOGE("Context or model not initialized");
     return;
@@ -59,8 +60,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   const char *p_str = env->GetStringUTFChars(prompt, nullptr);
   int p_bytes = strlen(p_str);
 
-  // Tokenization
-  const int n_tokens_max = p_bytes + 4;
+  // Tokenize prompt
+  const int n_tokens_max = p_bytes + 128;
   std::vector<llama_token> tokens(n_tokens_max);
   int n_tokens = llama_tokenize(llama_model_get_vocab(model), p_str, p_bytes,
                                 tokens.data(), tokens.size(), true, true);
@@ -72,47 +73,40 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
   tokens.resize(n_tokens);
   env->ReleaseStringUTFChars(prompt, p_str);
 
-  if (tokens.size() > (size_t)llama_n_ctx(ctx)) {
-    LOGE("Prompt too long for context (%zu vs %d)", tokens.size(),
-         llama_n_ctx(ctx));
-    return;
-  }
-
-  // --- PERSISTENT PREFIX CACHING ---
-  // Determine how many tokens can be reused from the last turn
+  // --- PREFIX CACHING (Persistent Memory) ---
   int n_keep = 0;
-  for (int i = 0; i < (int)std::min(tokens.size(), last_tokens.size()); i++) {
+  int min_length = std::min(tokens.size(), last_tokens.size());
+  for (int i = 0; i < min_length; i++) {
     if (tokens[i] != last_tokens[i])
       break;
     n_keep++;
   }
 
-  // If even one token changed at the start, reset the entire context
-  if (n_keep < (int)last_tokens.size()) {
-    llama_memory_seq_rm(llama_get_memory(ctx), -1, n_keep, -1);
+  // Clear mismatched tokens from KV cache
+  if (n_keep < last_tokens.size()) {
+    llama_kv_cache_seq_rm(ctx, 0, n_keep, -1);
   }
 
   int n_past = n_keep;
   int n_decode = tokens.size() - n_past;
 
-  // CRITICAL: If everything is cached, we still need logits for the last token to sample.
-  // We re-decode just the last token if n_decode is 0.
+  // Force evaluation of at least the last token to get logits
   if (n_decode == 0 && !tokens.empty()) {
-      n_past -= 1;
-      n_decode = 1;
-      // Must remove the overlapping KV cache entry before we can re-evaluate it
-      llama_memory_seq_rm(llama_get_memory(ctx), -1, n_past, -1);
+    n_past -= 1;
+    n_decode = 1;
+    llama_kv_cache_seq_rm(ctx, 0, n_past, -1);
   }
 
-  LOGI("Context Info: n_tokens=%zu, n_keep=%d, n_past=%d, n_decode=%d",
-       tokens.size(), n_keep, n_past, n_decode);
+  LOGI("Cache hit: kept %d tokens, decoding %d new tokens.", n_keep, n_decode);
 
+  // --- SAFE PROMPT EVALUATION ---
   int last_eval_idx = 0;
   if (n_decode > 0) {
-    const int chunk_size = 512;
+    int chunk_size = 512;
+    llama_batch batch = llama_batch_init(chunk_size, 0, 1);
+
     for (int i = 0; i < n_decode; i += chunk_size) {
       int n_eval = std::min(chunk_size, n_decode - i);
-      llama_batch batch = llama_batch_init(n_eval, 0, 1);
       batch.n_tokens = n_eval;
 
       for (int j = 0; j < n_eval; j++) {
@@ -120,78 +114,61 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
         batch.pos[j] = n_past + i + j;
         batch.n_seq_id[j] = 1;
         batch.seq_id[j][0] = 0;
-        batch.logits[j] = (i + j == n_decode - 1);
+        batch.logits[j] =
+            (i + j == n_decode - 1); // Logits only for the very last token
       }
 
-      LOGI("  Processing chunk %d/%d (%d tokens)...", (i / chunk_size) + 1,
-           (n_decode + chunk_size - 1) / chunk_size, n_eval);
-
-      int res = llama_decode(ctx, batch);
-      if (res != 0) {
-        LOGE("CRITICAL: llama_decode failed at index %d with code %d", i, res);
+      if (llama_decode(ctx, batch) != 0) {
+        LOGE("llama_decode failed during prompt ingestion");
         llama_batch_free(batch);
         last_tokens.clear();
         return;
       }
-      last_eval_idx = n_eval - 1; // Index within the last batch that had logits
-      llama_batch_free(batch);
+      last_eval_idx = n_eval - 1;
     }
+    llama_batch_free(batch);
   }
 
   last_tokens = tokens;
 
-  // Sampling setup
-  // Sampling setup: Optimized for Roleplay (Creative but coherent)
+  // --- SAMPLING & GENERATION ---
   auto smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
-  // 1. Penalties first
   llama_sampler_chain_add(smpl,
                           llama_sampler_init_penalties(512, 1.05f, 0.0f, 0.0f));
-  // 2. Filter (Min-P)
   llama_sampler_chain_add(smpl, llama_sampler_init_min_p(0.05f, 1));
-  // 3. Hotness (Temp)
   llama_sampler_chain_add(smpl, llama_sampler_init_temp(0.80f));
-  // 4. Sample (Distribution)
   llama_sampler_chain_add(smpl, llama_sampler_init_dist(time(NULL)));
+
   jclass callbackClass = env->GetObjectClass(callback);
-  jmethodID onTokenMethod =
-      env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)V");
+  jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)V");
 
   int n_cur = tokens.size();
   int n_gen = 0;
-  LOGI("Beginning generation (Cached: %d, New: %d tokens)...", n_past,
-       n_decode);
-
-  auto t_start = std::chrono::high_resolution_clock::now();
+  llama_batch gen_batch = llama_batch_init(1, 0, 1); // Init once!
 
   while (n_cur < llama_n_ctx(ctx) && n_gen < 1024) {
-    // Sample the next token. 
     int sampling_idx = (n_gen == 0) ? last_eval_idx : 0;
     llama_token id = llama_sampler_sample(smpl, ctx, sampling_idx);
     llama_sampler_accept(smpl, id);
 
-    bool is_eog = llama_vocab_is_eog(llama_model_get_vocab(model), id);
-    LOGI("Sampled token: %d (is_eog: %s, n_gen: %d)", id,
-         is_eog ? "true" : "false", n_gen);
-
-    if (is_eog)
+    if (llama_vocab_is_eog(llama_model_get_vocab(model), id))
       break;
 
-    // Stream token back to Java
     char piece[128];
     int n_chars = llama_token_to_piece(llama_model_get_vocab(model), id, piece,
                                        sizeof(piece), 0, false);
+
     if (n_chars > 0) {
-      std::string s(piece, n_chars);
-      jstring jword = env->NewStringUTF(s.c_str());
-      env->CallVoidMethod(callback, onTokenMethod, jword);
-      env->DeleteLocalRef(jword);
+      jbyteArray jbytes = env->NewByteArray(n_chars);
+      env->SetByteArrayRegion(jbytes, 0, n_chars,
+                              reinterpret_cast<const jbyte *>(piece));
+      env->CallVoidMethod(callback, onTokenMethod, jbytes);
+      env->DeleteLocalRef(jbytes);
     }
 
-    // Keep cache synchronized with generated output
-    last_tokens.push_back(id);
+    last_tokens.push_back(id); // Keep cache in sync with generated text!
 
-    llama_batch gen_batch = llama_batch_init(1, 0, 1);
-    gen_batch.n_tokens = 1; // CRITICAL FIX
+    gen_batch.n_tokens = 1;
     gen_batch.token[0] = id;
     gen_batch.pos[0] = n_cur;
     gen_batch.n_seq_id[0] = 1;
@@ -199,22 +176,14 @@ extern "C" JNIEXPORT void JNICALL Java_com_josie_ai_LlamaNative_generateStream(
     gen_batch.logits[0] = true;
 
     if (llama_decode(ctx, gen_batch) != 0) {
-      LOGE("Token decode failed at %d", n_cur);
-      llama_batch_free(gen_batch);
+      LOGE("Token decode failed");
       break;
     }
-    llama_batch_free(gen_batch);
     n_cur++;
     n_gen++;
   }
 
-  auto t_end = std::chrono::high_resolution_clock::now();
-  auto ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start)
-          .count();
-  LOGI("Gen done: %d tokens in %lld ms (%.2f t/s)", n_gen, ms,
-       (n_gen * 1000.0 / (ms + 1)));
-
+  llama_batch_free(gen_batch); // Free once!
   llama_sampler_free(smpl);
 }
 
