@@ -11,6 +11,26 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+#include <sys/sysinfo.h>
+
+static int detect_gpu_layers() {
+  struct sysinfo info;
+  sysinfo(&info);
+
+  long ram_gb = info.totalram / (1024LL * 1024LL * 1024LL);
+
+  if (ram_gb >= 12)
+    return 999; // Offload everything
+  if (ram_gb >= 8)
+    return 40;
+  if (ram_gb >= 6)
+    return 28;
+  if (ram_gb >= 4)
+    return 16;
+
+  return 8;
+}
+
 static llama_model *model = nullptr;
 static llama_context *ctx = nullptr;
 static std::vector<llama_token> last_tokens; // For prefix caching
@@ -18,6 +38,7 @@ static bool is_backend_initialized = false;
 
 extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
     JNIEnv *env, jobject thiz, jstring model_path) {
+
   const char *path = env->GetStringUTFChars(model_path, nullptr);
   LOGI("Loading model from %s", path);
 
@@ -27,7 +48,10 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   }
   LOGI("Step 1: backend init done, loading model file...");
 
+  // --- 1. SET GPU LAYERS HERE ---
   auto mparams = llama_model_default_params();
+  mparams.n_gpu_layers = detect_gpu_layers();
+
   model = llama_model_load_from_file(path, mparams);
 
   if (!model) {
@@ -38,17 +62,22 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
 
   LOGI("Step 2: model pointer = %p, allocating context...", model);
 
+  // --- 2. RESTORE FLASH ATTN TO SAVE RAM ---
   auto cparams = llama_context_default_params();
-  cparams.n_ctx = 1024;   // Reduced from 2048 to avoid OOM on mid-range devices
-  cparams.n_batch = 512;  // Reduced from 1024
-  cparams.n_ubatch = 256; // Reduced from 512
+  cparams.n_ctx = 1024;
+  cparams.n_batch = 512;
+  cparams.n_ubatch = 256;
+  cparams.flash_attn = true; // Crucial for reducing KV cache memory footprint
+  cparams.offload_kqv = true;
 
   unsigned int cores = std::thread::hardware_concurrency();
   cparams.n_threads = std::max(1u, cores / 2);
   cparams.n_threads_batch = std::max(1u, cores);
-  LOGI("Context parameters: threads=%d/%d, ctx=%d, batch=%d, ubatch=%d",
+
+  LOGI("Context parameters: threads=%d/%d, ctx=%d, batch=%d, ubatch=%d, "
+       "gpu_layers=%d",
        cparams.n_threads, cparams.n_threads_batch, cparams.n_ctx,
-       cparams.n_batch, cparams.n_ubatch);
+       cparams.n_batch, cparams.n_ubatch, mparams.n_gpu_layers);
 
   ctx = llama_init_from_model(model, cparams);
 

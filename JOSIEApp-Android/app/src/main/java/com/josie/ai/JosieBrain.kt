@@ -158,7 +158,7 @@ class JosieBrain(application: Application) : AndroidViewModel(application) {
             _currentModelName.value = "Loading: $name"
             Log.d(TAG, "Loading model: $modelPath")
             
-            val success = withContext(Dispatchers.IO) {
+            val success = withContext(Dispatchers.Default) { // <-- Change IO to Default
                 llamaNative.unload()
                 llamaNative.loadModel(modelPath)
             }
@@ -202,7 +202,7 @@ class JosieBrain(application: Application) : AndroidViewModel(application) {
             val tokenChannel = Channel<String>(Channel.UNLIMITED)
             
             // JNI Generation Task on IO thread
-            val generationJob = launch(Dispatchers.IO) {
+            val generationJob = launch(Dispatchers.Default) {
                 Log.d(TAG, "Starting JNI generation stream...")
                 try {
                     val prompt = buildPrompt(text)
