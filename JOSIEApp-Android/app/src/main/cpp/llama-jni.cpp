@@ -67,8 +67,6 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_josie_ai_LlamaNative_loadModel(
   cparams.n_ctx = 1024;
   cparams.n_batch = 512;
   cparams.n_ubatch = 512;
-  cparams.flash_attn = true; // Crucial for reducing KV cache memory footprint
-  cparams.offload_kqv = true;
 
   unsigned int cores = std::thread::hardware_concurrency();
   cparams.n_threads = std::max(2u, cores - 2);
