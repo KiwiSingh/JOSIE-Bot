@@ -48,7 +48,16 @@ except ImportError:
 
 # --- Configuration ---
 OLLAMA_HOST = "http://localhost:11434"
-MEMORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "josie_memory.json")
+def _get_memory_file():
+    # Use ~/Library/Application Support/JOSIE/ when running as a bundled app,
+    # fall back to the script's directory during development.
+    if getattr(sys, "frozen", False):
+        app_support = os.path.expanduser("~/Library/Application Support/JOSIE")
+        os.makedirs(app_support, exist_ok=True)
+        return os.path.join(app_support, "josie_memory.json")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "josie_memory.json")
+
+MEMORY_FILE = _get_memory_file()
 
 MODELS = {
     "Stheno 8B (v3.1)": {
@@ -149,6 +158,39 @@ class OllamaWrapper:
         except Exception:
             pass
 
+    # --- Safety ---
+
+    _CRISIS_PHRASES = [
+        "want to kill myself", "want to die", "going to kill myself",
+        "going to end my life", "planning to end my life",
+        "thinking about suicide", "thinking about killing myself",
+        "i should just die", "i should kill myself",
+        "better off dead", "better off without me",
+        "don't want to live", "dont want to live",
+        "no reason to live", "can't go on", "cant go on",
+        "end it all", "end my life", "take my own life",
+        "cut myself", "hurt myself", "harm myself",
+        "self harm", "self-harm",
+        "overdose on", "kill myself with",
+        "suicide note", "goodbye letter",
+        "i'm suicidal", "im suicidal", "feeling suicidal",
+    ]
+
+    _CRISIS_RESPONSE = (
+        "Hey. I'm stepping out of our world for a second because this matters more.\n\n"
+        "You don't have to be okay right now — but please reach out to someone who can really be there for you:\n\n"
+        "• iCall (India): 9152987821\n"
+        "• Vandrevala Foundation: 1860-2662-345 (24/7, free)\n"
+        "• International Association for Suicide Prevention: https://www.iasp.info/resources/Crisis_Centres/\n\n"
+        "I'm still here, and I'm not going anywhere. But please talk to one of them first. 💙"
+    )
+
+    def _is_crisis(self, prompt: str) -> bool:
+        """Returns True only for genuine self-harm or suicidal ideation.
+        Deliberately narrow — does NOT trigger on dark roleplay, sadness, or general distress."""
+        lower = prompt.lower()
+        return any(phrase in lower for phrase in self._CRISIS_PHRASES)
+
     def set_model(self, model_key):
         if model_key in MODELS:
             self.model_key = model_key
@@ -160,6 +202,8 @@ class OllamaWrapper:
         self._delete_memory()
 
     def generate(self, prompt: str) -> str:
+        if self._is_crisis(prompt):
+            return self._CRISIS_RESPONSE
         config = MODELS[self.model_key]
         payload = {
             "model": config["tag"],
