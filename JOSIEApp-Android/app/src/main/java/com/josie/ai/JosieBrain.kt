@@ -46,6 +46,44 @@ class JosieBrain : ViewModel() {
         <end_of_turn>
     """.trimIndent()
 
+    // ── Safety ──────────────────────────────────────────────────────────────
+
+    /**
+     * Returns true only for genuine self-harm or suicidal ideation.
+     * Deliberately narrow — does NOT trigger on dark roleplay, sadness, or general distress.
+     */
+    private fun isCrisisMessage(text: String): Boolean {
+        val lower = text.lowercase()
+        val exactPhrases = listOf(
+            "want to kill myself", "want to die", "going to kill myself",
+            "going to end my life", "planning to end my life",
+            "thinking about suicide", "thinking about killing myself",
+            "i should just die", "i should kill myself",
+            "better off dead", "better off without me",
+            "don't want to live", "dont want to live",
+            "no reason to live", "can't go on", "cant go on",
+            "end it all", "end my life", "take my own life",
+            "cut myself", "hurt myself", "harm myself",
+            "self harm", "self-harm",
+            "overdose on", "kill myself with",
+            "suicide note", "goodbye letter",
+            "i'm suicidal", "im suicidal", "feeling suicidal"
+        )
+        return exactPhrases.any { lower.contains(it) }
+    }
+
+    private val crisisResponse = """
+        Hey. I'm stepping out of our world for a second because this matters more.
+
+        You don't have to be okay right now — but please reach out to someone who can really be there for you:
+
+        • iCall (India): 9152987821
+        • Vandrevala Foundation: 1860-2662-345 (24/7, free)
+        • International Association for Suicide Prevention: https://www.iasp.info/resources/Crisis_Centres/
+
+        I'm still here, and I'm not going anywhere. But please talk to one of them first. 💙
+    """.trimIndent()
+
     fun loadModel(modelPath: String, name: String) {
         viewModelScope.launch {
             _status.value = ModelStatus.LOADING
@@ -70,6 +108,13 @@ class JosieBrain : ViewModel() {
 
     fun sendMessage(text: String, voiceManager: JosieVoiceManager? = null) {
         if (text.isBlank()) return
+
+        // Crisis guardrail: intercept before the model ever sees the prompt.
+        if (isCrisisMessage(text)) {
+            messages.add(ChatMessage(text = text, isUser = true))
+            messages.add(ChatMessage(text = crisisResponse, isUser = false))
+            return
+        }
         
         // Use a StringBuilder for efficient text accumulation
         val responseBuffer = StringBuilder()

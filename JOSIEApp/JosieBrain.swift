@@ -68,6 +68,42 @@ final class JosieBrain: ObservableObject {
     JOSIE: Ik praat met jou natuurlijk. Wat ben jij aan het doen?
     """
     
+    // MARK: - Safety
+
+    /// Returns true only for genuine self-harm or suicidal ideation.
+    /// Deliberately narrow — does NOT trigger on dark roleplay, sadness, or general distress.
+    private func isCrisisMessage(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        let exactPhrases = [
+            "want to kill myself", "want to die", "going to kill myself",
+            "going to end my life", "planning to end my life",
+            "thinking about suicide", "thinking about killing myself",
+            "i should just die", "i should kill myself",
+            "better off dead", "better off without me",
+            "don't want to live", "dont want to live",
+            "no reason to live", "can't go on", "cant go on",
+            "end it all", "end my life", "take my own life",
+            "cut myself", "hurt myself", "harm myself",
+            "self harm", "self-harm",
+            "overdose on", "kill myself with",
+            "suicide note", "goodbye letter",
+            "i'm suicidal", "im suicidal", "feeling suicidal"
+        ]
+        return exactPhrases.contains { lower.contains($0) }
+    }
+
+    private let crisisResponse = """
+    Hey. I'm stepping out of our world for a second because this matters more.
+
+    You don't have to be okay right now — but please reach out to someone who can really be there for you:
+
+    • iCall (India): 9152987821
+    • Vandrevala Foundation: 1860-2662-345 (24/7, free)
+    • International Association for Suicide Prevention: https://www.iasp.info/resources/Crisis_Centres/
+
+    I'm still here, and I'm not going anywhere. But please talk to one of them first. 💙
+    """
+
     // MARK: - Published State
     
     @Published var isLoading: Bool = false
@@ -318,6 +354,11 @@ final class JosieBrain: ObservableObject {
             return "Model not loaded."
         }
         
+        // Crisis guardrail: intercept before the model ever sees the prompt.
+        if isCrisisMessage(prompt) {
+            return crisisResponse
+        }
+
         guard !isGenerating else {
             return "Already generating."
         }
