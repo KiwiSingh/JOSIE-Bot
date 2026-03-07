@@ -444,15 +444,22 @@ final class JosieBrain: ObservableObject {
             let totalTokens  = systemTokens + trimmedHistory.reduce(0) { $0 + ($1.content.count / 4) } + promptTokens
             let dynamicKVSize = lowMemoryMode ? max(2048, totalTokens + 256) : nil
 
+            // repetitionContextSize must not exceed the number of tokens we're
+            // actually feeding in — MLX's sampler will index out-of-bounds if it
+            // does. Cap it to totalTokens so turn 3+ can't crash the sampler.
+            let safeRepetitionContext = min(64, totalTokens)
+
+            // kvGroupSize must evenly divide quantizedKVStart. Use 64/64 so the
+            // first quantized group is always aligned.
             let parameters = GenerateParameters(
-                maxTokens: lowMemoryMode ? min(maxTokens, 128) : 768,
+                maxTokens: lowMemoryMode ? min(maxTokens, 128) : maxTokens,
                 maxKVSize: dynamicKVSize,
                 kvBits: lowMemoryMode ? 4 : nil,
-                kvGroupSize: 32,
+                kvGroupSize: 64,
                 quantizedKVStart: 64,
                 temperature: 0.9,
                 repetitionPenalty: 1.1,
-                repetitionContextSize: 256
+                repetitionContextSize: safeRepetitionContext
             )
 
             var chatMessages: [Chat.Message] = [.system(personaPrompt)]
