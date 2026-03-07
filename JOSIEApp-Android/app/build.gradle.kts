@@ -40,7 +40,7 @@ android {
             }
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Vulkan enabled for GPU-accelerated inference on real devices.
             // ARM dot-product and FP16 intrinsics give a significant additional

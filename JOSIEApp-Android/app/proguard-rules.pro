@@ -25,3 +25,14 @@
 
 # Keep Kotlin metadata
 -keep class kotlin.Metadata { *; }
+
+# Keep JNI callback interfaces
+-keep class com.josie.ai.LlamaNative$StreamCallback { *; }
+
+# Keep JNI bridge classes
+-keep class com.josie.ai.LlamaNative { *; }
+
+# Keep methods called from native code
+-keepclassmembers class com.josie.ai.** {
+    native <methods>;
+}
