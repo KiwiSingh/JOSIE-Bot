@@ -136,8 +136,15 @@ final class JosieBrain: ObservableObject {
     private(set) var conversationHistory: [ConversationTurn] = []
     
     private var historyFileURL: URL? {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-            .first?.appendingPathComponent("josie_history.json")
+        // Per-model history file so switching models doesn't bleed stale turns
+        // from a different model's context into the new one.
+        let name = currentModelName
+            .trimmingCharacters(in: .whitespaces)
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:*?\"<>|"))
+            .joined(separator: "_")
+        let filename = "josie_history_\(name).json"
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            .first?.appendingPathComponent(filename)
     }
     
     private func loadHistory() {
@@ -347,6 +354,8 @@ final class JosieBrain: ObservableObject {
         modelContainer = nil
         pendingModelURL = nil
         pendingModelName = nil
+        // Load this model's own history file — per-model files mean stale turns
+        // from a different model can never bleed into this context.
         loadHistory()
         defer { isLoading = false }
         
@@ -444,15 +453,18 @@ final class JosieBrain: ObservableObject {
             let totalTokens  = systemTokens + trimmedHistory.reduce(0) { $0 + ($1.content.count / 4) } + promptTokens
             let dynamicKVSize = lowMemoryMode ? max(2048, totalTokens + 256) : nil
 
-            // repetitionContextSize must not exceed the number of tokens we're
-            // actually feeding in — MLX's sampler will index out-of-bounds if it
-            // does. Cap it to totalTokens so turn 3+ can't crash the sampler.
-            let safeRepetitionContext = min(64, totalTokens)
+            let effectiveMaxTokens = lowMemoryMode ? min(maxTokens, 128) : maxTokens
+
+            // repetitionContextSize must be <= the generation budget (maxTokens),
+            // not the prefill length. Capping to totalTokens (prefill) was wrong
+            // because the sampler checks against tokens-generated-so-far, not
+            // tokens-fed-in. 64 is a safe ceiling that works at any sequence length.
+            let safeRepetitionContext = min(64, effectiveMaxTokens)
 
             // kvGroupSize must evenly divide quantizedKVStart. Use 64/64 so the
             // first quantized group is always aligned.
             let parameters = GenerateParameters(
-                maxTokens: lowMemoryMode ? min(maxTokens, 128) : maxTokens,
+                maxTokens: effectiveMaxTokens,
                 maxKVSize: dynamicKVSize,
                 kvBits: lowMemoryMode ? 4 : nil,
                 kvGroupSize: 64,
