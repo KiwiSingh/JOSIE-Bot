@@ -127,6 +127,7 @@ final class JosieBrain: ObservableObject {
     private var pendingModelURL: URL?
     private var pendingModelName: String?
     private var cancellables = Set<AnyCancellable>()
+    private var pendingModelEviction = false
     
     // MARK: - Conversation History
     
@@ -309,9 +310,17 @@ final class JosieBrain: ObservableObject {
         ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
-                print("⚠️ Memory warning received, releasing model.")
-                self.modelContainer = nil
-                self.isGenerating = false
+                print("⚠️ Memory warning received.")
+                // Never nil the container while a generation is in flight —
+                // doing so deallocates MLX GPU buffers the stream is still
+                // iterating, causing a hard crash. Defer eviction until
+                // generate() finishes its current stream safely.
+                if self.isGenerating {
+                    self.pendingModelEviction = true
+                } else {
+                    print("⚠️ Releasing model now.")
+                    self.modelContainer = nil
+                }
             }
         }
         #endif
@@ -501,10 +510,24 @@ final class JosieBrain: ObservableObject {
             let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
             appendTurn(role: "user", content: prompt)
             appendTurn(role: "assistant", content: trimmed)
+
+            // Stream is done — safe to evict the model now if a memory warning
+            // arrived while we were generating.
+            if pendingModelEviction {
+                pendingModelEviction = false
+                print("⚠️ Releasing model after generation completed.")
+                modelContainer = nil
+            }
+
             return trimmed
             
         } catch {
             print("❌ Generation failed:", error)
+            // Also honour any deferred eviction on the error path.
+            if pendingModelEviction {
+                pendingModelEviction = false
+                modelContainer = nil
+            }
             return "Generation failed."
         }
     }
