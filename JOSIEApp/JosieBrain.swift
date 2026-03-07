@@ -40,13 +40,37 @@ struct GenerateResult {
     let output: String
 }
 
+struct LMOutput {
+    var chunk: String? { nil }
+}
+
 final class ModelContainer {
     init(configuration: ModelConfiguration) async throws {
         throw MLXLLMUnavailableError.missingPackage
     }
 
-    func generate(prompt: String, parameters: GenerateParameters) async throws -> GenerateResult {
+    func prepare(input: UserInput) async throws -> UserInput {
         throw MLXLLMUnavailableError.missingPackage
+    }
+
+    func generate(
+        input: UserInput,
+        parameters: GenerateParameters
+    ) async throws -> AsyncThrowingStream<LMOutput, Error> {
+        throw MLXLLMUnavailableError.missingPackage
+    }
+}
+
+struct UserInput {
+    enum Prompt { case chat([Chat.Message]) }
+    let prompt: Prompt
+}
+
+enum Chat {
+    enum Message {
+        case system(String)
+        case user(String)
+        case assistant(String)
     }
 }
 #endif
