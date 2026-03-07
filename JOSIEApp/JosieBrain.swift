@@ -317,6 +317,18 @@ final class JosieBrain: ObservableObject {
         defer { isLoading = false }
         currentModelName = "Loading: \(modelName)"
 
+        // Flush MLX's speculative GPU buffer pool before allocating a new model.
+        // Without this, the old pool + the new model weights both live in memory
+        // simultaneously at peak, which is the primary cause of jetsam kills on
+        // reload after eviction.
+        // set(cacheLimit: 0) forces an immediate eviction of all pooled Metal
+        // buffers; restoring to .max lets MLX resume normal pool management.
+        #if canImport(MLXLLM)
+        MLX.GPU.set(cacheLimit: 0)
+        MLX.GPU.set(cacheLimit: .max)
+        print("🧹 GPU cache flushed before model load")
+        #endif
+
         let estimatedBytes = max(1, tensorFilesBytes(at: modelURL))
         let capBytes = Int(maxMemoryMB * 1024 * 1024)
         let policy = WiredSumPolicy(cap: capBytes)
@@ -499,8 +511,11 @@ final class JosieBrain: ObservableObject {
             }
 
             // Size the KV cache to exactly what we'll feed in, plus response headroom.
+            // In lowMemoryMode we cap hard at 1024 tokens — the previous max(2048, …)
+            // could silently balloon to 3-4k for long conversations, adding 500MB+
+            // of KV state that triggered the jetsam kill during generation.
             let totalTokens  = systemTokens + trimmedHistory.reduce(0) { $0 + ($1.content.count / 4) } + promptTokens
-            let dynamicKVSize = lowMemoryMode ? max(2048, totalTokens + 256) : nil
+            let dynamicKVSize = lowMemoryMode ? min(1024, totalTokens + 128) : nil
 
             let effectiveMaxTokens = lowMemoryMode ? min(maxTokens, 128) : maxTokens
 
@@ -573,12 +588,38 @@ final class JosieBrain: ObservableObject {
     }
     
     // MARK: - Memory Monitoring
-    
+
+    // Fraction of maxMemoryMB at which we proactively evict the model.
+    // The OS memory warning arrives very late (~200 MB before jetsam kill);
+    // evicting here gives us a large safety margin without waiting for the warning.
+    private let proactiveEvictionThreshold = 0.80
+
     private func startMemoryMonitor() {
         Timer.publish(every: 1.0, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.memoryUsageMB = Self.currentMemoryUsage()
+                guard let self else { return }
+                let usage = Self.currentMemoryUsage()
+                self.memoryUsageMB = usage
+
+                // Proactive eviction: if we've crossed 80% of the cap and the model
+                // is resident, free it now — before the OS sends a warning.
+                let threshold = self.maxMemoryMB * self.proactiveEvictionThreshold
+                if usage > threshold, self.modelContainer != nil {
+                    if self.isGenerating {
+                        if !self.pendingModelEviction {
+                            self.pendingModelEviction = true
+                            print("⚠️ Proactive eviction queued (\(Int(usage)) MB > \(Int(threshold)) MB threshold) — generation in flight.")
+                        }
+                    } else {
+                        print("⚠️ Proactive eviction triggered (\(Int(usage)) MB > \(Int(threshold)) MB threshold).")
+                        #if canImport(MLXLLM)
+                        MLX.GPU.set(cacheLimit: 0)
+                        MLX.GPU.set(cacheLimit: .max)
+                        #endif
+                        self.evictModel()
+                    }
+                }
             }
             .store(in: &cancellables)
     }
