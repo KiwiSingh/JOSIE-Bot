@@ -37,7 +37,7 @@ For the easiest experience, download the latest stable application for your plat
 
 ## 📱 iOS Version
 
-- **Model Availability**: The iOS build currently ships with only three models (**JosieQwen**, **JosieGabby** and **JosieNidum**). For the best experience, use **JosieQwen** or **JosieGabby**.
+- **Model Availability**: The iOS build currently ships with only three models (**JosieQwen**, **JosieGabby** and **JosieNidum**). For the best experience, use **JosieQwen**.
 - **Model Download**: Download the models as a zip file [here](https://mega.nz/file/g0liAITa#VA0Tz8-2eNcVWi66Q-pgT8UKr9gVglY5k2fqKI-nLpI), unzip it, and move the individual model folders into the `JOSIE/Models` folder in your Files app.
 - **Download Issues**: If you hit rate limits or download errors, use **[MegaBasterd](https://github.com/tonikelope/megabasterd)**.
 - **Installation:** Sideload the IPA using Sideloadly, AltStore, or TrollStore.
