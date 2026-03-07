@@ -421,35 +421,28 @@ final class JosieBrain: ObservableObject {
                 return "Memory limit reached. Try a shorter prompt or keep Low Memory enabled."
             }
             
-            // Estimate token counts (rough: 1 token ≈ 4 chars) to size the KV cache
-            // dynamically so it doesn't overflow as history grows.
+            // Rough token estimates (1 token ≈ 4 chars).
             let systemTokens  = personaPrompt.count / 4
             let promptTokens  = prompt.count / 4
-            let historyTokens = conversationHistory.reduce(0) { $0 + ($1.content.count / 4) }
-            let totalTokens   = systemTokens + historyTokens + promptTokens
 
-            // Reserve at least 256 tokens for the response; floor at 2048 so early
-            // turns don't get an unnecessarily tiny cache.
-            let dynamicKVSize = lowMemoryMode ? max(2048, totalTokens + 256) : nil
-
-            // Trim history to fit within the token budget *before* building the
-            // message list, so the model never sees more context than it can handle.
-            let responseBudget = 256
+            // Trim history from the front so the total context stays within budget.
+            // Walk newest-to-oldest, keeping turns until we'd exceed the limit.
             let maxContextTokens = lowMemoryMode ? 2048 : 6144
-            let availableForHistory = maxContextTokens - systemTokens - promptTokens - responseBudget
-            var trimmedHistory = conversationHistory
-            if availableForHistory > 0 {
+            let historyBudget    = maxContextTokens - systemTokens - promptTokens - 256
+            var trimmedHistory: [ConversationTurn] = []
+            if historyBudget > 0 {
                 var accumulated = 0
-                var firstKept = trimmedHistory.endIndex
-                for i in stride(from: trimmedHistory.count - 1, through: 0, by: -1) {
-                    accumulated += trimmedHistory[i].content.count / 4
-                    if accumulated > availableForHistory { break }
-                    firstKept = trimmedHistory.index(trimmedHistory.startIndex, offsetBy: i)
+                for turn in conversationHistory.reversed() {
+                    let t = turn.content.count / 4
+                    if accumulated + t > historyBudget { break }
+                    accumulated += t
+                    trimmedHistory.insert(turn, at: 0)
                 }
-                trimmedHistory = Array(trimmedHistory[firstKept...])
-            } else {
-                trimmedHistory = []
             }
+
+            // Size the KV cache to exactly what we'll feed in, plus response headroom.
+            let totalTokens  = systemTokens + trimmedHistory.reduce(0) { $0 + ($1.content.count / 4) } + promptTokens
+            let dynamicKVSize = lowMemoryMode ? max(2048, totalTokens + 256) : nil
 
             let parameters = GenerateParameters(
                 maxTokens: lowMemoryMode ? min(maxTokens, 128) : 768,
