@@ -346,10 +346,15 @@ final class JosieBrain: ObservableObject {
                 // doing so deallocates MLX GPU buffers the stream is still
                 // iterating, causing a hard crash. Defer eviction until
                 // generate() finishes its current stream safely.
+                //
+                // pendingModelURL / pendingModelName are intentionally kept intact
+                // so the lazy-load path in generate() can reload the model the
+                // next time the user sends a message — no manual intervention needed.
                 if self.isGenerating {
                     self.pendingModelEviction = true
+                    print("⚠️ Generation in flight — eviction deferred.")
                 } else {
-                    print("⚠️ Releasing model now.")
+                    print("⚠️ Releasing model now. Will reload lazily on next message.")
                     self.evictModel()
                 }
             }
@@ -390,47 +395,52 @@ final class JosieBrain: ObservableObject {
         }
         
         isLoading = true
-        currentModelName = modelName
-        evictModel()
-        pendingModelURL = nil
-        pendingModelName = nil
-        // Load this model's own history file — per-model files mean stale turns
-        // from a different model can never bleed into this context.
-        loadHistory()
         defer { isLoading = false }
-        
+
         guard let modelsURL = modelsDirectoryURL() else {
             currentModelName = "Models folder unavailable"
             print("❌ Models folder unavailable")
             return
         }
-        
+
         let modelURL = modelsURL.appendingPathComponent(modelName, isDirectory: true)
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
             currentModelName = "Model not found"
             print("❌ Model folder missing:", modelURL.path)
             return
         }
-        
+
         let missingFiles = missingModelFiles(in: modelURL)
         if !missingFiles.isEmpty {
             currentModelName = "Model files missing"
             print("❌ Model files missing:", missingFiles.joined(separator: ", "))
             return
         }
-        
+
         let sizeMB = directorySizeMB(at: modelURL)
         if sizeMB > (maxMemoryMB * 0.75) {
             lowMemoryMode = true
         }
-
         if sizeMB > maxMemoryMB {
             print("⚠️ Model size exceeds memory cap: \(Int(sizeMB)) MB > \(Int(maxMemoryMB)) MB")
         }
 
-        pendingModelURL = modelURL
+        // Switching to a different model — evict the old container and swap pending state.
+        // We intentionally keep pendingModel* alive after this so that a memory-warning
+        // eviction can always reload by calling loadPreparedModelIfNeeded() again.
+        let switchingModel = pendingModelName != modelName
+        if switchingModel {
+            evictModel()
+            pendingModelEviction = false
+        }
+
+        pendingModelURL  = modelURL
         pendingModelName = modelName
-        currentModelName = "Ready: \(modelName)"
+        currentModelName = modelName
+
+        // Load this model's own history file — per-model files mean stale turns
+        // from a different model can never bleed into this context.
+        if switchingModel { loadHistory() }
     }
     
     // MARK: - Text Generation
@@ -440,26 +450,25 @@ final class JosieBrain: ObservableObject {
         maxTokens: Int = 256
     ) async -> String {
         
+        // Crisis guardrail: intercept before any model work.
+        if isCrisisMessage(prompt) { return crisisResponse }
+
+        guard !isGenerating else { return "Already generating." }
+
+        // Lazy-load: bring the model up if it was never loaded, or if a memory
+        // warning previously evicted it. pendingModel* is always preserved so
+        // this path works transparently after eviction.
         if modelContainer == nil {
             do {
                 try await loadPreparedModelIfNeeded()
             } catch {
                 print("❌ Model load failed:", error)
-                return "Model load failed."
+                return "Model load failed. Please select a model."
             }
         }
 
         guard let modelContainer else {
-            return "Model not loaded."
-        }
-        
-        // Crisis guardrail: intercept before the model ever sees the prompt.
-        if isCrisisMessage(prompt) {
-            return crisisResponse
-        }
-
-        guard !isGenerating else {
-            return "Already generating."
+            return "No model selected. Please choose a model first."
         }
         
         isGenerating = true
