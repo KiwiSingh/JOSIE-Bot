@@ -12,5 +12,6 @@ class LlamaNative {
     }
 
     external fun loadModel(modelPath: String): Boolean
+    external fun unloadModel()
     external fun generateStream(prompt: String, callback: StreamCallback)
 }

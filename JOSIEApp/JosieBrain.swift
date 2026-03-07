@@ -267,7 +267,7 @@ final class JosieBrain: ObservableObject {
     private func recommendedMemoryCapMB() -> Double {
         let physicalMB = Double(ProcessInfo.processInfo.physicalMemory) / 1024 / 1024
         let safetyCap = physicalMB * 0.7
-        return min(7000, max(3000, safetyCap))
+        return min(4200, max(2500, safetyCap))
     }
     
     private func directorySizeMB(at url: URL) -> Double {
@@ -323,11 +323,8 @@ final class JosieBrain: ObservableObject {
         // reload after eviction.
         // set(cacheLimit: 0) forces an immediate eviction of all pooled Metal
         // buffers; restoring to .max lets MLX resume normal pool management.
-        #if canImport(MLXLLM)
-        MLX.GPU.set(cacheLimit: 0)
-        MLX.GPU.set(cacheLimit: .max)
-        print("🧹 GPU cache flushed before model load")
-        #endif
+        
+
 
         let estimatedBytes = max(1, tensorFilesBytes(at: modelURL))
         let capBytes = Int(maxMemoryMB * 1024 * 1024)
@@ -491,13 +488,16 @@ final class JosieBrain: ObservableObject {
                 return "Memory limit reached. Try a shorter prompt or keep Low Memory enabled."
             }
             
+            let effectiveMaxTokens = lowMemoryMode ? min(maxTokens, 96) : min(maxTokens, 256)
+
+            
             // Rough token estimates (1 token ≈ 4 chars).
             let systemTokens  = personaPrompt.count / 4
             let promptTokens  = prompt.count / 4
 
             // Trim history from the front so the total context stays within budget.
             // Walk newest-to-oldest, keeping turns until we'd exceed the limit.
-            let maxContextTokens = lowMemoryMode ? 2048 : 6144
+            let maxContextTokens = lowMemoryMode ? 1024 : 2048
             let historyBudget    = maxContextTokens - systemTokens - promptTokens - 256
             var trimmedHistory: [ConversationTurn] = []
             if historyBudget > 0 {
@@ -515,25 +515,23 @@ final class JosieBrain: ObservableObject {
             // could silently balloon to 3-4k for long conversations, adding 500MB+
             // of KV state that triggered the jetsam kill during generation.
             let totalTokens  = systemTokens + trimmedHistory.reduce(0) { $0 + ($1.content.count / 4) } + promptTokens
-            let dynamicKVSize = lowMemoryMode ? min(1024, totalTokens + 128) : nil
-
-            let effectiveMaxTokens = lowMemoryMode ? min(maxTokens, 128) : maxTokens
+            let dynamicKVSize = 512
 
             // repetitionContextSize must be <= the generation budget (maxTokens),
             // not the prefill length. Capping to totalTokens (prefill) was wrong
             // because the sampler checks against tokens-generated-so-far, not
             // tokens-fed-in. 64 is a safe ceiling that works at any sequence length.
-            let safeRepetitionContext = min(64, effectiveMaxTokens)
+            let safeRepetitionContext = min(32, effectiveMaxTokens / 2)
 
-            // kvGroupSize must evenly divide quantizedKVStart. Use 64/64 so the
-            // first quantized group is always aligned.
+            // kvGroupSize must evenly divide quantizedKVStart. Use 32/32 for Apple GPU alignment.
             let parameters = GenerateParameters(
                 maxTokens: effectiveMaxTokens,
                 maxKVSize: dynamicKVSize,
-                kvBits: lowMemoryMode ? 4 : nil,
-                kvGroupSize: 64,
-                quantizedKVStart: 64,
-                temperature: 0.9,
+                kvBits: 4,
+                kvGroupSize: 32,
+                quantizedKVStart: 32,
+                temperature: 0.8,
+                topP: 0.95,
                 repetitionPenalty: 1.1,
                 repetitionContextSize: safeRepetitionContext
             )
@@ -550,6 +548,9 @@ final class JosieBrain: ObservableObject {
             let input = try await modelContainer.prepare(
                 input: userInput
             )
+            
+            await Task.yield()
+
             let stream = try await modelContainer.generate(
                 input: input,
                 parameters: parameters
@@ -613,10 +614,6 @@ final class JosieBrain: ObservableObject {
                         }
                     } else {
                         print("⚠️ Proactive eviction triggered (\(Int(usage)) MB > \(Int(threshold)) MB threshold).")
-                        #if canImport(MLXLLM)
-                        MLX.GPU.set(cacheLimit: 0)
-                        MLX.GPU.set(cacheLimit: .max)
-                        #endif
                         self.evictModel()
                     }
                 }

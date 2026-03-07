@@ -32,6 +32,11 @@ class JosieBrain : ViewModel() {
 
     private val llamaNative = LlamaNative()
 
+    // Lazy-load state: registered but not yet loaded into native memory
+    private var pendingModelPath: String? = null
+    private var pendingModelName: String? = null
+    private var modelLoaded = false
+
     // Persistent memory
     private val memoryFacts = mutableListOf<String>()
     private var appContext: Context? = null
@@ -182,25 +187,72 @@ $memoryText
     // MODEL LOAD
     // ------------------------------------------------
 
+    /**
+     * Registers a model for lazy loading. The native model is NOT loaded here —
+     * it is loaded on the first [sendMessage] call. This keeps memory free until
+     * the user actually starts a conversation.
+     */
     fun loadModel(modelPath: String, name: String) {
+        val switching = pendingModelPath != modelPath
 
-        viewModelScope.launch {
+        if (switching && modelLoaded) {
+            // Evict the currently loaded native model before registering a new one
+            llamaNative.unloadModel()
+            modelLoaded = false
+            Log.d(TAG, "Evicted previous model for: $name")
+        }
 
-            _status.value = ModelStatus.LOADING
-            _currentModelName.value = "Loading: $name"
+        pendingModelPath = modelPath
+        pendingModelName = name
 
-            val success = withContext(Dispatchers.IO) {
-                llamaNative.loadModel(modelPath)
-            }
+        _currentModelName.value = "Ready: $name"
+        _status.value = ModelStatus.IDLE
+        Log.d(TAG, "Model registered (lazy): $name")
+    }
 
-            if (success) {
-                _status.value = ModelStatus.READY
-                _currentModelName.value = name
-                Log.d(TAG, "Model loaded")
-            } else {
-                _status.value = ModelStatus.ERROR
-                _currentModelName.value = "Failed to Load"
-            }
+    /**
+     * Actually loads the native model if it hasn't been loaded yet.
+     * Called automatically by [sendMessage] — callers never need to invoke this directly.
+     * Returns true if the model is ready to generate.
+     */
+    private suspend fun ensureModelLoaded(): Boolean {
+        if (modelLoaded) return true
+
+        val path = pendingModelPath ?: return false
+        val name = pendingModelName ?: return false
+
+        _status.value = ModelStatus.LOADING
+        _currentModelName.value = "Loading: $name"
+
+        val success = withContext(Dispatchers.IO) {
+            llamaNative.loadModel(path)
+        }
+
+        return if (success) {
+            modelLoaded = true
+            _currentModelName.value = name
+            _status.value = ModelStatus.READY
+            Log.d(TAG, "Model loaded lazily: $name")
+            true
+        } else {
+            _status.value = ModelStatus.ERROR
+            _currentModelName.value = "Failed to Load"
+            Log.e(TAG, "Lazy model load failed: $name")
+            false
+        }
+    }
+
+    /**
+     * Evicts the native model from memory. The pending path/name are preserved
+     * so the next [sendMessage] call will transparently reload without any
+     * user intervention.
+     */
+    fun evictModel() {
+        if (modelLoaded) {
+            llamaNative.unloadModel()
+            modelLoaded = false
+            _status.value = ModelStatus.IDLE
+            Log.d(TAG, "Model evicted. Will reload lazily on next message.")
         }
     }
 
@@ -236,14 +288,11 @@ You deserve help and support.
 
         if (text.isBlank()) return
 
-        // Guardrail
+        // Guardrail — intercept before touching the model
         if (detectSelfHarm(text)) {
-
             val guard = guardrailResponse()
-
             messages.add(ChatMessage(text = text, isUser = true))
             messages.add(ChatMessage(text = guard, isUser = false))
-
             return
         }
 
@@ -259,6 +308,16 @@ You deserve help and support.
         _status.value = ModelStatus.GENERATING
 
         viewModelScope.launch {
+
+            // Lazy-load: bring the native model up if it was evicted or never loaded.
+            // pendingModel* is always kept intact so this is transparent to the user.
+            if (!ensureModelLoaded()) {
+                messages[messageIndex] = messages[messageIndex].copy(
+                    text = "No model selected. Please choose a model first."
+                )
+                _status.value = ModelStatus.IDLE
+                return@launch
+            }
 
             val tokenChannel = Channel<String>(Channel.UNLIMITED)
 
