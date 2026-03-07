@@ -421,19 +421,49 @@ final class JosieBrain: ObservableObject {
                 return "Memory limit reached. Try a shorter prompt or keep Low Memory enabled."
             }
             
+            // Estimate token counts (rough: 1 token ≈ 4 chars) to size the KV cache
+            // dynamically so it doesn't overflow as history grows.
+            let systemTokens  = personaPrompt.count / 4
+            let promptTokens  = prompt.count / 4
+            let historyTokens = conversationHistory.reduce(0) { $0 + ($1.content.count / 4) }
+            let totalTokens   = systemTokens + historyTokens + promptTokens
+
+            // Reserve at least 256 tokens for the response; floor at 2048 so early
+            // turns don't get an unnecessarily tiny cache.
+            let dynamicKVSize = lowMemoryMode ? max(2048, totalTokens + 256) : nil
+
+            // Trim history to fit within the token budget *before* building the
+            // message list, so the model never sees more context than it can handle.
+            let responseBudget = 256
+            let maxContextTokens = lowMemoryMode ? 2048 : 6144
+            let availableForHistory = maxContextTokens - systemTokens - promptTokens - responseBudget
+            var trimmedHistory = conversationHistory
+            if availableForHistory > 0 {
+                var accumulated = 0
+                var firstKept = trimmedHistory.endIndex
+                for i in stride(from: trimmedHistory.count - 1, through: 0, by: -1) {
+                    accumulated += trimmedHistory[i].content.count / 4
+                    if accumulated > availableForHistory { break }
+                    firstKept = trimmedHistory.index(trimmedHistory.startIndex, offsetBy: i)
+                }
+                trimmedHistory = Array(trimmedHistory[firstKept...])
+            } else {
+                trimmedHistory = []
+            }
+
             let parameters = GenerateParameters(
                 maxTokens: lowMemoryMode ? min(maxTokens, 128) : 768,
-                maxKVSize: lowMemoryMode ? 1024 : nil,
+                maxKVSize: dynamicKVSize,
                 kvBits: lowMemoryMode ? 4 : nil,
                 kvGroupSize: 32,
-                quantizedKVStart: 0,
+                quantizedKVStart: 64,
                 temperature: 0.9,
                 repetitionPenalty: 1.1,
                 repetitionContextSize: 256
             )
-            
+
             var chatMessages: [Chat.Message] = [.system(personaPrompt)]
-            for turn in conversationHistory {
+            for turn in trimmedHistory {
                 chatMessages.append(turn.role == "user" ? .user(turn.content) : .assistant(turn.content))
             }
             chatMessages.append(.user(prompt))
