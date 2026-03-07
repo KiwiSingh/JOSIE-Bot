@@ -152,6 +152,13 @@ final class JosieBrain: ObservableObject {
     private var pendingModelName: String?
     private var cancellables = Set<AnyCancellable>()
     private var pendingModelEviction = false
+
+    /// Single choke-point for releasing the model container so the compiler
+    /// always resolves the optional write unambiguously, regardless of which
+    /// ModelContainer type MLXLLM exports in the current SDK version.
+    private func evictModel() {
+        modelContainer = .none
+    }
     
     // MARK: - Conversation History
     
@@ -343,7 +350,7 @@ final class JosieBrain: ObservableObject {
                     self.pendingModelEviction = true
                 } else {
                     print("⚠️ Releasing model now.")
-                    self.modelContainer = nil
+                    self.evictModel()
                 }
             }
         }
@@ -384,7 +391,7 @@ final class JosieBrain: ObservableObject {
         
         isLoading = true
         currentModelName = modelName
-        modelContainer = nil
+        evictModel()
         pendingModelURL = nil
         pendingModelName = nil
         // Load this model's own history file — per-model files mean stale turns
@@ -540,7 +547,7 @@ final class JosieBrain: ObservableObject {
             if pendingModelEviction {
                 pendingModelEviction = false
                 print("⚠️ Releasing model after generation completed.")
-                modelContainer = nil
+                evictModel()
             }
 
             return trimmed
@@ -550,7 +557,7 @@ final class JosieBrain: ObservableObject {
             // Also honour any deferred eviction on the error path.
             if pendingModelEviction {
                 pendingModelEviction = false
-                modelContainer = nil
+                evictModel()
             }
             return "Generation failed."
         }
